@@ -33,6 +33,7 @@ import (
 	resources_count_spec2 "reactive-tech.io/kubegres/internal/controller/spec/enforcer/resources_count_spec"
 	statefulset2 "reactive-tech.io/kubegres/internal/controller/spec/enforcer/resources_count_spec/statefulset"
 	"reactive-tech.io/kubegres/internal/controller/spec/enforcer/resources_count_spec/statefulset/failover"
+	"reactive-tech.io/kubegres/internal/controller/spec/enforcer/statefulset_spec"
 	statefulset_spec2 "reactive-tech.io/kubegres/internal/controller/spec/enforcer/statefulset_spec"
 	template2 "reactive-tech.io/kubegres/internal/controller/spec/template"
 	"reactive-tech.io/kubegres/internal/controller/states"
@@ -169,6 +170,7 @@ func addStatefulSetSpecEnforcers(rc *ResourcesContext) {
 	livenessProbeSpecEnforcer := statefulset_spec2.CreateLivenessProbeSpecEnforcer(rc.KubegresContext)
 	readinessProbeSpecEnforcer := statefulset_spec2.CreateReadinessProbeSpecEnforcer(rc.KubegresContext)
 	serviAccountNameSpecEnforcer := statefulset_spec2.CreateServiceAccountNameSpecEnforcer(rc.KubegresContext)
+	startupProbeSpecEnforcer := statefulset_spec.CreateStartupProbeSpecEnforcer(rc.KubegresContext)
 
 	rc.StatefulSetsSpecsEnforcer = statefulset_spec2.CreateStatefulSetsSpecsEnforcer(rc.KubegresContext)
 	rc.StatefulSetsSpecsEnforcer.AddSpecEnforcer(&imageSpecEnforcer)
@@ -184,6 +186,7 @@ func addStatefulSetSpecEnforcers(rc *ResourcesContext) {
 	rc.StatefulSetsSpecsEnforcer.AddSpecEnforcer(&livenessProbeSpecEnforcer)
 	rc.StatefulSetsSpecsEnforcer.AddSpecEnforcer(&readinessProbeSpecEnforcer)
 	rc.StatefulSetsSpecsEnforcer.AddSpecEnforcer(&serviAccountNameSpecEnforcer)
+	rc.StatefulSetsSpecsEnforcer.AddSpecEnforcer(&startupProbeSpecEnforcer)
 
 	rc.AllStatefulSetsSpecEnforcer = statefulset_spec2.CreateAllStatefulSetsSpecEnforcer(rc.KubegresContext, rc.ResourcesStates, rc.BlockingOperation, rc.StatefulSetsSpecsEnforcer)
 }
