@@ -59,6 +59,7 @@ type Volume struct {
 type Probe struct {
 	LivenessProbe  *v1.Probe `json:"livenessProbe,omitempty"`
 	ReadinessProbe *v1.Probe `json:"readinessProbe,omitempty"`
+	StartupProbe   *v1.Probe `json:"startupProbe,omitempty"`
 }
 
 type KubegresSpec struct {

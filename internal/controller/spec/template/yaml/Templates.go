@@ -403,6 +403,17 @@ spec:
                   apiVersion: v1
                   fieldPath: status.podIP
 
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - exec pg_isready -U $POSTGRES_USER -h $POD_IP
+            failureThreshold: 15
+            initialDelaySeconds: 10
+            periodSeconds: 60
+            successThreshold: 1
+
           livenessProbe:
             exec:
               command:
@@ -550,6 +561,17 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: status.podIP
+
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - exec pg_isready -U $POSTGRES_USER -h $POD_IP
+            failureThreshold: 15
+            initialDelaySeconds: 10
+            periodSeconds: 60
+            successThreshold: 1
 
           livenessProbe:
             exec:
