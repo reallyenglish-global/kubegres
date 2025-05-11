@@ -1,0 +1,48 @@
+name: Run Kubegres Tests
+
+on:
+  push:
+    branches: [main, github]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Run `make test` in kind cluster
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install Kind
+        uses: helm/kind-action@v1.8.0
+        with:
+          version: v0.22.0
+
+      - name: Create Kind cluster
+        run: kind create cluster --wait 60s
+
+      - name: Set KUBECONFIG env
+        run: echo "KUBECONFIG=${HOME}/.kube/config" >> $GITHUB_ENV
+
+      - name: Install Kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Install CRDs and Kubegres controller (optional)
+        run: |
+          make install
+          make deploy IMG=reactivetechio/kubegres
+        env:
+          KUBECONFIG: ${{ env.KUBECONFIG }}
+
+      - name: Run Tests
+        run: make test
+
