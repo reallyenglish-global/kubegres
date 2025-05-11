@@ -1,4 +1,4 @@
-name: Run Kubegres Tests
+name: Kubegres CI
 
 on:
   push:
@@ -8,8 +8,8 @@ on:
 
 jobs:
   test:
+    name: Run Kubegres Tests in Kind
     runs-on: ubuntu-latest
-    name: Run `make test` in kind cluster
 
     steps:
       - name: Checkout code
@@ -20,15 +20,22 @@ jobs:
         with:
           go-version: '1.22'
 
-      - name: Install Kind
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Set up Kind cluster
         uses: helm/kind-action@v1.8.0
         with:
           version: v0.22.0
 
-      - name: Create Kind cluster
-        run: kind create cluster --wait 60s
-
-      - name: Set KUBECONFIG env
+      - name: Export KUBECONFIG
         run: echo "KUBECONFIG=${HOME}/.kube/config" >> $GITHUB_ENV
 
       - name: Install Kustomize
@@ -36,13 +43,17 @@ jobs:
           curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
           sudo mv kustomize /usr/local/bin/
 
-      - name: Install CRDs and Kubegres controller (optional)
+      - name: Install CRDs and Deploy Kubegres
         run: |
           make install
           make deploy IMG=reactivetechio/kubegres
-        env:
-          KUBECONFIG: ${{ env.KUBECONFIG }}
+
+      - name: Wait for Kubegres controller to be ready
+        run: kubectl rollout status deployment/kubegres-controller -n kubegres-system --timeout=90s
 
       - name: Run Tests
         run: make test
 
+      - name: Delete Kind cluster (cleanup)
+        if: always()
+        run: kind delete cluster
