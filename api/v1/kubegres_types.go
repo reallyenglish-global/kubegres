@@ -61,6 +61,10 @@ type Probe struct {
 	ReadinessProbe *v1.Probe `json:"readinessProbe,omitempty"`
 }
 
+type Lifecycle struct {
+	PreStop *v1.LifecycleHandler `json:"preStop,omitempty"`
+}
+
 type KubegresSpec struct {
 	Replicas                 *int32                    `json:"replicas,omitempty"`
 	Image                    string                    `json:"image,omitempty"`
@@ -77,6 +81,7 @@ type KubegresSpec struct {
 	SecurityContext          *v1.PodSecurityContext    `json:"securityContext,omitempty"`
 	ContainerSecurityContext *v1.SecurityContext       `json:"containerSecurityContext,omitempty"`
 	Probe                    Probe                     `json:"probe,omitempty"`
+	Lifecycle                Lifecycle                 `json:"lifecycle,omitempty"`
 	ServiceAccountName       string                    `json:"serviceAccountName,omitempty"`
 }
 

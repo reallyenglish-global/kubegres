@@ -446,6 +446,13 @@ spec:
             - name: base-config
               mountPath: /etc/pg_hba.conf
               subPath: pg_hba.conf
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - sh
+                - -c
+                - pg_ctl -D $PGDATA stop -m fast
 `
 ReplicaServiceTemplate = `apiVersion: v1
 kind: Service
@@ -586,5 +593,13 @@ spec:
             - name: base-config
               mountPath: /etc/pg_hba.conf
               subPath: pg_hba.conf
+
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - sh
+                - -c
+                - pg_ctl -D $PGDATA stop -m fast
 `
 )
