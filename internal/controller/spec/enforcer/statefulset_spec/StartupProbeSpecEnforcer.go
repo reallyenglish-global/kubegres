@@ -21,10 +21,11 @@ limitations under the License.
 package statefulset_spec
 
 import (
-	apps "k8s.io/api/apps/v1"
-	"reactive-tech.io/kubegres/controllers/ctx"
-	"reactive-tech.io/kubegres/controllers/states"
 	"reflect"
+
+	apps "k8s.io/api/apps/v1"
+	"reactive-tech.io/kubegres/internal/controller/ctx"
+	"reactive-tech.io/kubegres/internal/controller/states"
 )
 
 type StartupProbeSpecEnforcer struct {
