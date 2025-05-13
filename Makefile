@@ -61,7 +61,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: build envtest ## Run tests.
-	go test $(shell pwd)/internal/test -run $(shell pwd)/internal/test/suite_test.go -v -test.timeout 10000s
+	go test $(shell pwd)/internal/test -run $(shell pwd)/internal/test/suite_test.go -v -test.timeout 10000s --ginkgo.timeout=10000s
 	#KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 # TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
