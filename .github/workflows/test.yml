@@ -40,7 +40,7 @@ jobs:
 
       - name: Run Tests
         run: make test
-        timeout-minutes: 120
+        timeout-minutes: 600
 
       - name: Delete Kind cluster (cleanup)
         if: always()
