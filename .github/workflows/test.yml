@@ -2,7 +2,7 @@ name: Kubegres CI
 
 on:
   push:
-    branches: [main, github]
+    branches: [main]
   pull_request:
     branches: [main]
 
