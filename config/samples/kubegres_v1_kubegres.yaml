@@ -10,3 +10,6 @@ spec:
     # Set true to promote a Ready replica when Kubernetes marks the primary
     # for voluntary disruption (for example, a node drain eviction).
     onPrimaryPodDrain: true
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1

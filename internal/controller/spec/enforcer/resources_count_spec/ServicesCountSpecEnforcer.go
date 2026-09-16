@@ -22,9 +22,15 @@ package resources_count_spec
 
 import (
 	core "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	postgresV1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 	"reactive-tech.io/kubegres/internal/controller/spec/template"
 	"reactive-tech.io/kubegres/internal/controller/states"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type ServicesCountSpecEnforcer struct {
@@ -46,6 +52,10 @@ func CreateServicesCountSpecEnforcer(kubegresContext ctx.KubegresContext,
 
 func (r *ServicesCountSpecEnforcer) EnforceSpec() error {
 
+	if err := r.ensurePodDisruptionBudget(); err != nil {
+		return err
+	}
+
 	if !r.isPrimaryServiceDeployed() && r.isPrimaryDbReady() {
 		err := r.deployPrimaryService()
 		if err != nil {
@@ -61,6 +71,39 @@ func (r *ServicesCountSpecEnforcer) EnforceSpec() error {
 	}
 
 	return nil
+}
+
+func (r *ServicesCountSpecEnforcer) ensurePodDisruptionBudget() error {
+	kubegres := r.kubegresContext.Kubegres
+	name := kubegres.Name
+	current := &policy.PodDisruptionBudget{}
+	err := r.kubegresContext.Client.Get(r.kubegresContext.Ctx, client.ObjectKey{Name: name, Namespace: kubegres.Namespace}, current)
+	enabled := kubegres.Spec.PodDisruptionBudget.Enabled || kubegres.Spec.Failover.OnPrimaryPodDrain
+	if apierrors.IsNotFound(err) && !enabled {
+		return nil
+	}
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if !enabled {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return r.kubegresContext.Client.Delete(r.kubegresContext.Ctx, current)
+	}
+	minAvailable := int32(1)
+	if kubegres.Spec.PodDisruptionBudget.MinAvailable != nil {
+		minAvailable = *kubegres.Spec.PodDisruptionBudget.MinAvailable
+	}
+	desired := &policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: kubegres.Namespace, OwnerReferences: []metav1.OwnerReference{{APIVersion: postgresV1.GroupVersion.String(), Kind: "Kubegres", Name: kubegres.Name, UID: kubegres.UID}}},
+		Spec:       policy.PodDisruptionBudgetSpec{MinAvailable: func() *intstr.IntOrString { v := intstr.FromInt(int(minAvailable)); return &v }(), Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": kubegres.Name}}},
+	}
+	if apierrors.IsNotFound(err) {
+		return r.kubegresContext.Client.Create(r.kubegresContext.Ctx, desired)
+	}
+	current.Spec = desired.Spec
+	return r.kubegresContext.Client.Update(r.kubegresContext.Ctx, current)
 }
 
 func (r *ServicesCountSpecEnforcer) isPrimaryServiceDeployed() bool {
