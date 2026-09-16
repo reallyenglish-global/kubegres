@@ -27,6 +27,24 @@ The external node-upgrade controller must still move and verify the replica befo
 
 Do not enable this with only one database instance. If no Ready replica exists, Kubegres logs the existing no-replica failover condition and does not promote anything.
 
+## PDB and ordered migration
+
+Enable both features together:
+
+```yaml
+spec:
+  replicas: 2
+  failover:
+    onPrimaryPodDrain: true
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+```
+
+Kubegres creates one owner-managed PDB selecting both `primary` and `replica` Pods. This permits one database Pod to be evicted while ensuring a second Pod remains available; separate PDBs per role would incorrectly block replica migration. `onPrimaryPodDrain` reacts only to the Kubernetes `DisruptionTarget` condition with eviction/preemption reasons. It does not react to arbitrary Pod deletions.
+
+The sequence is: move/restart the replica and wait for it to become Ready and streaming; allow drain of the primary; promote the verified replica; then let Kubegres reconstruct the former primary as a replica. The old primary must not remain writable during promotion.
+
 ## Rollback
 
 Set `onPrimaryPodDrain: false` to disable the automatic trigger. Existing manual promotion through `failover.promotePod` and existing crash failover behavior remain unchanged.

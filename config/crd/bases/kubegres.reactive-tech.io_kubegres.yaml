@@ -506,6 +506,14 @@ spec:
                         type: object
                     type: object
                 type: object
+              podDisruptionBudget:
+                properties:
+                  enabled:
+                    type: boolean
+                  minAvailable:
+                    format: int32
+                    type: integer
+                type: object
               port:
                 format: int32
                 type: integer
