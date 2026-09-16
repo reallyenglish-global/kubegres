@@ -2,6 +2,10 @@
 replication and failover enabled out-of-the box. It brings simplicity when using PostgreSql considering how complex managing
 stateful-set's life-cycle and data replication could be with Kubernetes.
 
+## Voluntary node-drain failover
+
+See [`docs/primary-drain-failover.md`](docs/primary-drain-failover.md) for the opt-in `spec.failover.onPrimaryPodDrain` feature.
+
 **Features**
 
 * It can manage one or many clusters of Postgres instances.
