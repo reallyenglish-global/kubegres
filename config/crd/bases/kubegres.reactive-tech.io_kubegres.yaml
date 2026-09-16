@@ -372,6 +372,11 @@ spec:
                 properties:
                   isDisabled:
                     type: boolean
+                  onPrimaryPodDrain:
+                    description: |-
+                      OnPrimaryPodDrain promotes a Ready replica when Kubernetes marks the primary
+                      for voluntary disruption (for example, a node drain eviction).
+                    type: boolean
                   promotePod:
                     type: string
                 type: object

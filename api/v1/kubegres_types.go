@@ -38,6 +38,9 @@ type KubegresBackUp struct {
 type KubegresFailover struct {
 	IsDisabled bool   `json:"isDisabled,omitempty"`
 	PromotePod string `json:"promotePod,omitempty"`
+	// OnPrimaryPodDrain promotes a Ready replica when Kubernetes marks the primary
+	// for voluntary disruption (for example, a node drain eviction).
+	OnPrimaryPodDrain bool `json:"onPrimaryPodDrain,omitempty"`
 }
 
 type KubegresScheduler struct {

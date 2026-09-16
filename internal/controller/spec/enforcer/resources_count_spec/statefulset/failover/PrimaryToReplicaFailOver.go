@@ -78,6 +78,10 @@ func (r *PrimaryToReplicaFailOver) ShouldWeFailOver() bool {
 	} else if r.isManualFailoverRequested() {
 		return true
 
+	} else if r.isPrimaryPodBeingVoluntarilyDisrupted() {
+		r.logPrimaryPodDrainFailover()
+		return true
+
 	} else if r.isNewPrimaryRequired() {
 
 		if r.isAutomaticFailoverDisabled() {
@@ -130,6 +134,32 @@ func (r *PrimaryToReplicaFailOver) isFailOverCompleted(operation v1.KubegresBloc
 
 func (r *PrimaryToReplicaFailOver) isNewPrimaryRequired() bool {
 	return !r.isPrimaryDbDeployed() || !r.isPrimaryDbReady()
+}
+
+func (r *PrimaryToReplicaFailOver) isPrimaryPodBeingVoluntarilyDisrupted() bool {
+	return r.kubegresContext.Kubegres.Spec.Failover.OnPrimaryPodDrain &&
+		isVoluntaryDisruption(r.resourcesStates.StatefulSets.Primary.Pod.Pod)
+}
+
+func isVoluntaryDisruption(pod core.Pod) bool {
+	if pod.DeletionTimestamp == nil {
+		return false
+	}
+
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == core.DisruptionTarget && condition.Status == core.ConditionTrue &&
+			(condition.Reason == "EvictionByEvictionAPI" || condition.Reason == "PreemptionByScheduler") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (r *PrimaryToReplicaFailOver) logPrimaryPodDrainFailover() {
+	r.kubegresContext.Log.InfoEvent("PrimaryPodDrainFailover",
+		"Primary Pod is marked for voluntary disruption; promoting a Ready Replica before the primary is removed.",
+		"Primary Pod", r.resourcesStates.StatefulSets.Primary.Pod.Pod.Name)
 }
 
 func (r *PrimaryToReplicaFailOver) isPrimaryDbReady() bool {

@@ -6,4 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: kubegres-sample
 spec:
-  # TODO(user): Add fields here
+  failover:
+    # Set true to promote a Ready replica when Kubernetes marks the primary
+    # for voluntary disruption (for example, a node drain eviction).
+    onPrimaryPodDrain: true
