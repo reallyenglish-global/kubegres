@@ -35,7 +35,7 @@ import (
 	postgresv1 "reactive-tech.io/kubegres/api/v1"
 )
 
-var _ = Describe("Setting Kubegres spec 'livenessProbe'", func() {
+var _ = Describe("Setting Kubegres spec 'livenessProbe'", Label("database-specs", "shard-10"), func() {
 
 	var test = SpecLivenessProbeTest{}
 

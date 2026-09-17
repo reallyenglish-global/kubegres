@@ -35,7 +35,7 @@ import (
 
 const customNamespace = "toto"
 
-var _ = Describe("Creating Kubegres with a custom namespace", func() {
+var _ = Describe("Creating Kubegres with a custom namespace", Label("scheduling-metadata", "shard-8"), func() {
 
 	var test = CustomNamespaceTest{}
 

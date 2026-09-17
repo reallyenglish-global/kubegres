@@ -4,12 +4,40 @@ on:
   push:
     branches: [main, pre-stop]
   pull_request:
-    branches: [main]
 
 jobs:
-  test:
-    name: Run Kubegres Tests in Kind
+  fast:
+    name: Fast checks and shard coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make test-fast
+
+  test:
+    needs: fast
+    name: Run Kubegres Tests (${{ matrix.group }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - shard-1
+          - shard-2
+          - shard-3
+          - shard-4
+          - shard-5
+          - shard-6
+          - shard-7
+          - shard-8
+          - shard-9
+          - shard-10
+          - shard-11
+          - shard-12
 
     steps:
       - name: Checkout code
@@ -25,13 +53,26 @@ jobs:
         uses: helm/kind-action@v1.8.0
         with:
           version: v0.22.0
+          cluster_name: kubegres
+          config: internal/test/util/kindcluster/kind-cluster-config.yaml
 
       - name: Export KUBECONFIG
         run: echo "KUBECONFIG=${HOME}/.kube/config" >> "$GITHUB_ENV"
 
       - name: Run Tests
+        env:
+          GINKGO_LABEL_FILTER: ${{ matrix.group }}
+          KUBEGRES_KEEP_TEST_CLUSTER: "true"
         run: make test
         timeout-minutes: 60
+
+      - name: Summarise spec durations
+        if: always()
+        run: |
+          if test -f artifacts/reports/report.json; then
+            python3 hack/report_tests.py artifacts/reports/report.json > artifacts/reports/summary.md
+            cat artifacts/reports/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Collect Kubernetes diagnostics
         if: always()
@@ -45,14 +86,14 @@ jobs:
           kubectl describe pods -A > artifacts/kubernetes/pod-descriptions.txt || true
           kubectl describe statefulsets -A > artifacts/kubernetes/statefulset-descriptions.txt || true
 
-      - name: Upload Kubernetes diagnostics
+      - name: Upload test reports and Kubernetes diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: kubegres-kubernetes-diagnostics
-          path: artifacts/kubernetes
+          name: kubegres-kubernetes-diagnostics-${{ matrix.group }}
+          path: artifacts
           if-no-files-found: ignore
 
       - name: Delete Kind cluster (cleanup)
         if: always()
-        run: kind delete cluster
+        run: kind delete cluster --name kubegres

@@ -32,7 +32,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Replica instances are not available, checking recovery works", func() {
+var _ = Describe("Replica instances are not available, checking recovery works", Label("core-failover", "shard-3"), func() {
 
 	var test = ReplicaFailureAndRecoveryTest{}
 
