@@ -128,7 +128,8 @@ var _ = BeforeSuite(func() {
 	log.Println("Waiting for Kubernetes to start")
 	log.Println("Kubernetes has started")
 
-	k8sClientTest = k8sManager.GetClient()
+	// Keep test reads on the direct client created above. The manager client is
+	// cache-backed and can block indefinitely when its informer cache stalls.
 	Expect(k8sClientTest).ToNot(BeNil())
 
 	log.Print("END OF: BeforeSuite")
