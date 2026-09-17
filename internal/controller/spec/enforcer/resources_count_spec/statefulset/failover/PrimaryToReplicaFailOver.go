@@ -309,9 +309,15 @@ func (r *PrimaryToReplicaFailOver) promoteReplicaToPrimary(newPrimary statefulse
 
 func (r *PrimaryToReplicaFailOver) waitBeforePromotingReplicaToPrimary(newPrimary statefulset.StatefulSetWrapper) error {
 
-	r.deletePrimaryStatefulSet()
+	err := r.deletePrimaryStatefulSet()
+	if err != nil {
+		r.kubegresContext.Log.ErrorEvent("FailOverPrimaryDeletionErr", err,
+			"FailOver: Unable to delete the failing Primary StatefulSet.",
+			"Primary name", r.resourcesStates.StatefulSets.Primary.StatefulSet.Name)
+		return err
+	}
 
-	err := r.activateOperationWaitingBeforeFailingOver(newPrimary)
+	err = r.activateOperationWaitingBeforeFailingOver(newPrimary)
 	if err != nil {
 		r.kubegresContext.Log.ErrorEvent("FailOverOperationActivationErr", err,
 			"Error while activating a blocking operation to wait before starting the FailOver of a Primary DB.",
@@ -336,7 +342,7 @@ func (r *PrimaryToReplicaFailOver) activateOperationFailingOver(newPrimary state
 		newPrimary.InstanceIndex)
 }
 
-func (r *PrimaryToReplicaFailOver) deletePrimaryStatefulSet() {
+func (r *PrimaryToReplicaFailOver) deletePrimaryStatefulSet() error {
 
 	statefulSetToDelete := r.resourcesStates.StatefulSets.Primary.StatefulSet
 	r.kubegresContext.Log.Info("FailOver: Deleting the failing Primary StatefulSet.",
@@ -348,6 +354,7 @@ func (r *PrimaryToReplicaFailOver) deletePrimaryStatefulSet() {
 			"Deleted the failing Primary StatefulSet.",
 			"Primary name", statefulSetToDelete.Name)
 	}
+	return err
 }
 
 func (r *PrimaryToReplicaFailOver) logFailoverCannotHappenAsNoReplicaDeployed() {

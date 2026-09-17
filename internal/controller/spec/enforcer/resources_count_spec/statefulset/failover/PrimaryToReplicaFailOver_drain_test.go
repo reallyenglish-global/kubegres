@@ -1,12 +1,16 @@
 package failover
 
 import (
+	"context"
+	"errors"
+	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 	"reactive-tech.io/kubegres/internal/controller/states"
 	"reactive-tech.io/kubegres/internal/controller/states/statefulset"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 )
 
@@ -63,5 +67,35 @@ func TestSelectReplicaToPromoteSkipsDisruptedReadyReplica(t *testing.T) {
 	}
 	if selected.InstanceIndex != 2 {
 		t.Fatalf("selectReplicaToPromote() selected instance %d, want 2", selected.InstanceIndex)
+	}
+}
+
+type deleteErrorClient struct {
+	client.Client
+	err error
+}
+
+func (c deleteErrorClient) Delete(context.Context, client.Object, ...client.DeleteOption) error {
+	return c.err
+}
+
+func TestDeletePrimaryStatefulSetReturnsDeleteError(t *testing.T) {
+	wantErr := errors.New("delete failed")
+	failover := PrimaryToReplicaFailOver{
+		kubegresContext: ctx.KubegresContext{
+			Ctx:    context.Background(),
+			Client: deleteErrorClient{err: wantErr},
+		},
+		resourcesStates: states.ResourcesStates{
+			StatefulSets: statefulset.StatefulSetsStates{
+				Primary: statefulset.StatefulSetWrapper{
+					StatefulSet: appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "primary"}},
+				},
+			},
+		},
+	}
+
+	if err := failover.deletePrimaryStatefulSet(); !errors.Is(err, wantErr) {
+		t.Fatalf("deletePrimaryStatefulSet() error = %v, want %v", err, wantErr)
 	}
 }
