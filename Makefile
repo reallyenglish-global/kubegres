@@ -59,6 +59,15 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
+.PHONY: test-fast
+test-fast: ## Fail fast on pure configuration, cleanup, compilation, and shard coverage.
+	go test ./api/... ./internal/controller/... ./internal/test/util/... -count=1 -timeout=2m
+	go vet ./...
+	mkdir -p artifacts/reports
+	go test ./internal/test -run TestAPIs -count=1 -timeout=2m --ginkgo.dry-run --ginkgo.json-report=../../artifacts/reports/coverage.json
+	python3 hack/report_tests.py artifacts/reports/coverage.json hack/ci-shards.json
+	python3 -m unittest discover -s hack -p "test_ci_*.py"
+
 GINKGO_LABEL_FILTER ?=
 
 .PHONY: test

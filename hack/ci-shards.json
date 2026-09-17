@@ -1,0 +1,229 @@
+{
+  "method": "Whole-Describe LPT grouping. Partial timing samples from runs 35218229936 and 35213798887; estimates = spec count * (max(210s, observed sample) + 30s cleanup), not measured totals. Unknown specs get the same floor. Rebalance from JSON reports once complete.",
+  "groups": [
+    {
+      "file": "spec_failover_is_disabled_test.go",
+      "specs": 3,
+      "observed_samples": 6,
+      "observed_median_seconds": 240.3,
+      "estimated_seconds": 962.4,
+      "shard": "shard-7"
+    },
+    {
+      "file": "many_diff_kubegres_instances_test.go",
+      "specs": 1,
+      "observed_samples": 0,
+      "observed_median_seconds": null,
+      "estimated_seconds": 240,
+      "shard": "shard-9"
+    },
+    {
+      "file": "postgres_conf_wal_level_logical_test.go",
+      "specs": 1,
+      "observed_samples": 2,
+      "observed_median_seconds": 350.5,
+      "estimated_seconds": 380.9,
+      "shard": "shard-8"
+    },
+    {
+      "file": "spec_volumeAndVolumeMount_test.go",
+      "specs": 6,
+      "observed_samples": 4,
+      "observed_median_seconds": 195.6,
+      "estimated_seconds": 1440,
+      "shard": "shard-4"
+    },
+    {
+      "file": "spec_backup_test.go",
+      "specs": 10,
+      "observed_samples": 8,
+      "observed_median_seconds": 191.1,
+      "estimated_seconds": 2400.4,
+      "shard": "shard-1"
+    },
+    {
+      "file": "spec_port_test.go",
+      "specs": 3,
+      "observed_samples": 3,
+      "observed_median_seconds": 205.5,
+      "estimated_seconds": 720,
+      "shard": "shard-11"
+    },
+    {
+      "file": "spec_databaseStorageClassName_test.go",
+      "specs": 3,
+      "observed_samples": 0,
+      "observed_median_seconds": null,
+      "estimated_seconds": 720,
+      "shard": "shard-10"
+    },
+    {
+      "file": "custom_annotation_test.go",
+      "specs": 1,
+      "observed_samples": 1,
+      "observed_median_seconds": 200.1,
+      "estimated_seconds": 240,
+      "shard": "shard-7"
+    },
+    {
+      "file": "spec_serviceAccountName_test.go",
+      "specs": 3,
+      "observed_samples": 2,
+      "observed_median_seconds": 205.5,
+      "estimated_seconds": 720,
+      "shard": "shard-8"
+    },
+    {
+      "file": "spec_replica_test.go",
+      "specs": 8,
+      "observed_samples": 6,
+      "observed_median_seconds": 5.0,
+      "estimated_seconds": 1920,
+      "shard": "shard-3"
+    },
+    {
+      "file": "spec_image_test.go",
+      "specs": 3,
+      "observed_samples": 6,
+      "observed_median_seconds": 200.3,
+      "estimated_seconds": 750.4,
+      "shard": "shard-12"
+    },
+    {
+      "file": "spec_databaseSize_test.go",
+      "specs": 3,
+      "observed_samples": 6,
+      "observed_median_seconds": 10.0,
+      "estimated_seconds": 720,
+      "shard": "shard-9"
+    },
+    {
+      "file": "custom_namespace_test.go",
+      "specs": 4,
+      "observed_samples": 0,
+      "observed_median_seconds": null,
+      "estimated_seconds": 960,
+      "shard": "shard-8"
+    },
+    {
+      "file": "spec_volumeClaimTemplates_test.go",
+      "specs": 5,
+      "observed_samples": 0,
+      "observed_median_seconds": null,
+      "estimated_seconds": 1200,
+      "shard": "shard-6"
+    },
+    {
+      "file": "spec_tolerations_test.go",
+      "specs": 3,
+      "observed_samples": 1,
+      "observed_median_seconds": 205.1,
+      "estimated_seconds": 720,
+      "shard": "shard-7"
+    },
+    {
+      "file": "spec_livenessProbe_test.go",
+      "specs": 2,
+      "observed_samples": 4,
+      "observed_median_seconds": 197.8,
+      "estimated_seconds": 480,
+      "shard": "shard-10"
+    },
+    {
+      "file": "spec_affinity_test.go",
+      "specs": 3,
+      "observed_samples": 3,
+      "observed_median_seconds": 205.1,
+      "estimated_seconds": 741.5,
+      "shard": "shard-12"
+    },
+    {
+      "file": "spec_resource_test.go",
+      "specs": 3,
+      "observed_samples": 3,
+      "observed_median_seconds": 205.5,
+      "estimated_seconds": 752.2,
+      "shard": "shard-10"
+    },
+    {
+      "file": "spec_databaseVolumeMount_test.go",
+      "specs": 3,
+      "observed_samples": 3,
+      "observed_median_seconds": 200.5,
+      "estimated_seconds": 720,
+      "shard": "shard-6"
+    },
+    {
+      "file": "spec_customConfig_test.go",
+      "specs": 9,
+      "observed_samples": 9,
+      "observed_median_seconds": 205.0,
+      "estimated_seconds": 2160,
+      "shard": "shard-2"
+    },
+    {
+      "file": "spec_securityContext_test.go",
+      "specs": 3,
+      "observed_samples": 6,
+      "observed_median_seconds": 202.8,
+      "estimated_seconds": 720,
+      "shard": "shard-5"
+    },
+    {
+      "file": "spec_envVariables_test.go",
+      "specs": 4,
+      "observed_samples": 4,
+      "observed_median_seconds": 100.0,
+      "estimated_seconds": 960,
+      "shard": "shard-9"
+    },
+    {
+      "file": "spec_pod_manually_promoted_test.go",
+      "specs": 4,
+      "observed_samples": 8,
+      "observed_median_seconds": 208.8,
+      "estimated_seconds": 1268.8,
+      "shard": "shard-5"
+    },
+    {
+      "file": "spec_readinessProbe_test.go",
+      "specs": 2,
+      "observed_samples": 3,
+      "observed_median_seconds": 205.1,
+      "estimated_seconds": 501.4,
+      "shard": "shard-11"
+    },
+    {
+      "file": "data_is_replicated_test.go",
+      "specs": 2,
+      "observed_samples": 0,
+      "observed_median_seconds": null,
+      "estimated_seconds": 480,
+      "shard": "shard-12"
+    },
+    {
+      "file": "primary_failure_and_recovery_test.go",
+      "specs": 3,
+      "observed_samples": 4,
+      "observed_median_seconds": 147.8,
+      "estimated_seconds": 720,
+      "shard": "shard-4"
+    },
+    {
+      "file": "replica_failure_and_recovery_test.go",
+      "specs": 1,
+      "observed_samples": 0,
+      "observed_median_seconds": null,
+      "estimated_seconds": 240,
+      "shard": "shard-3"
+    },
+    {
+      "file": "spec_containerSecurityContext_test.go",
+      "specs": 3,
+      "observed_samples": 6,
+      "observed_median_seconds": 205.3,
+      "estimated_seconds": 751.9,
+      "shard": "shard-11"
+    }
+  ]
+}

@@ -35,7 +35,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Setting Kubegres specs 'volume.volume' and 'volume.volumeMount'", Label("storage-config"), func() {
+var _ = Describe("Setting Kubegres specs 'volume.volume' and 'volume.volumeMount'", Label("storage-config", "shard-4"), func() {
 
 	var test = SpecVolumeAndVolumeMountTest{}
 

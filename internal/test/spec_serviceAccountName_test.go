@@ -34,7 +34,7 @@ import (
 	"reactive-tech.io/kubegres/internal/test/util/testcases"
 )
 
-var _ = Describe("Setting Kubegres spec 'serviceAccountName'", Label("scheduling-metadata"), func() {
+var _ = Describe("Setting Kubegres spec 'serviceAccountName'", Label("scheduling-metadata", "shard-8"), func() {
 
 	var test = SpecServiceAccountNameTest{}
 

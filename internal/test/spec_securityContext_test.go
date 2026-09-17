@@ -37,7 +37,7 @@ import (
 	postgresv1 "reactive-tech.io/kubegres/api/v1"
 )
 
-var _ = Describe("Setting Kubegres spec 'securityContext'", Label("scheduling-metadata"), func() {
+var _ = Describe("Setting Kubegres spec 'securityContext'", Label("scheduling-metadata", "shard-5"), func() {
 
 	var test = SpecsecurityContextTest{}
 

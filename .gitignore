@@ -21,6 +21,8 @@ Dockerfile.cross
 !vendor/**/zz_generated.*
 
 test-output.txt
+/artifacts/
+__pycache__/
 
 # editor and IDE paraphernalia
 .idea

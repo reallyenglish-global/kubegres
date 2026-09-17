@@ -35,7 +35,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Setting Kubegres spec 'volume.volumeClaimTemplates'", Label("storage-config"), func() {
+var _ = Describe("Setting Kubegres spec 'volume.volumeClaimTemplates'", Label("storage-config", "shard-6"), func() {
 
 	var test = SpecVolumeClaimTemplatesTest{}
 

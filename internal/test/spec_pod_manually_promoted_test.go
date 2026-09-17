@@ -33,7 +33,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Primary instances is not available, when the promotion of a PostgreSql instance is manually requested THEN promotion should be triggered.", Label("core-failover"), func() {
+var _ = Describe("Primary instances is not available, when the promotion of a PostgreSql instance is manually requested THEN promotion should be triggered.", Label("core-failover", "shard-5"), func() {
 
 	var test = SpecFailoverIsDisabledAndPromotePodAreSetTest{}
 

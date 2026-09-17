@@ -33,7 +33,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Setting Kubegres spec 'replica'", Label("database-specs"), func() {
+var _ = Describe("Setting Kubegres spec 'replica'", Label("database-specs", "shard-3"), func() {
 
 	var test = SpecReplicaTest{}
 

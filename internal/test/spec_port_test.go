@@ -35,7 +35,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Setting Kubegres spec 'port'", Label("scheduling-metadata"), func() {
+var _ = Describe("Setting Kubegres spec 'port'", Label("scheduling-metadata", "shard-11"), func() {
 
 	var test = SpecPortTest{}
 

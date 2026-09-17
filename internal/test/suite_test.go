@@ -21,9 +21,12 @@ limitations under the License.
 package test
 
 import (
+	"context"
 	"fmt"
 	"k8s.io/client-go/tools/record"
 	"log"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"reactive-tech.io/kubegres/internal/controller"
 	util2 "reactive-tech.io/kubegres/internal/test/util"
@@ -136,6 +139,18 @@ var _ = BeforeSuite(func() {
 
 })
 
+// Run before AfterEach resource deletion, so the failing state is retained.
+var _ = JustAfterEach(func() {
+	if !CurrentSpecReport().Failed() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	dest := filepath.Join("..", "..", "artifacts", "failures", fmt.Sprint(time.Now().UnixNano()))
+	output, err := exec.CommandContext(ctx, "python3", "../../hack/collect_test_diagnostics.py", dest).CombinedOutput()
+	fmt.Fprintf(GinkgoWriter, "Failure diagnostics: %s (%v)\n%s", dest, err, output)
+})
+
 var _ = AfterSuite(func() {
 
 	log.Print("START OF: Suite AfterSuite")
@@ -147,7 +162,9 @@ var _ = AfterSuite(func() {
 
 	time.Sleep(5 * time.Second)
 
-	kindCluster.DeleteCluster()
+	if os.Getenv("KUBEGRES_KEEP_TEST_CLUSTER") != "true" {
+		kindCluster.DeleteCluster()
+	}
 
 	log.Print("END OF: Suite AfterSuite")
 })
