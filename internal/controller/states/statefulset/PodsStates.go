@@ -34,11 +34,12 @@ type PodStates struct {
 }
 
 type PodWrapper struct {
-	IsDeployed    bool
-	IsReady       bool
-	IsStuck       bool
-	InstanceIndex int32
-	Pod           core.Pod
+	IsDeployed                  bool
+	IsReady                     bool
+	IsBeingVoluntarilyDisrupted bool
+	IsStuck                     bool
+	InstanceIndex               int32
+	Pod                         core.Pod
 }
 
 func loadPodsStates(kubegresContext ctx.KubegresContext) (PodStates, error) {
@@ -56,15 +57,17 @@ func (r *PodStates) loadStates() (err error) {
 
 	for _, pod := range deployedPods.Items {
 
+		isBeingVoluntarilyDisrupted := IsPodBeingVoluntarilyDisrupted(pod)
 		isPodReady := r.isPodReady(pod)
 		isPodStuck := r.isPodStuck(pod)
 
 		podWrapper := PodWrapper{
-			IsDeployed:    true,
-			IsReady:       isPodReady && !isPodStuck,
-			IsStuck:       isPodStuck,
-			InstanceIndex: r.getInstanceIndex(pod),
-			Pod:           pod,
+			IsDeployed:                  true,
+			IsReady:                     isPodReady && !isPodStuck,
+			IsBeingVoluntarilyDisrupted: isBeingVoluntarilyDisrupted,
+			IsStuck:                     isPodStuck,
+			InstanceIndex:               r.getInstanceIndex(pod),
+			Pod:                         pod,
 		}
 
 		r.pods = append(r.pods, podWrapper)
@@ -95,8 +98,7 @@ func (r *PodStates) getDeployedPods() (*core.PodList, error) {
 }
 
 func (r *PodStates) isPodReady(pod core.Pod) bool {
-
-	if len(pod.Status.ContainerStatuses) == 0 {
+	if IsPodBeingVoluntarilyDisrupted(pod) || len(pod.Status.ContainerStatuses) == 0 {
 		return false
 	}
 
@@ -122,4 +124,23 @@ func (r *PodStates) isPodStuck(pod core.Pod) bool {
 func (r *PodStates) getInstanceIndex(pod core.Pod) int32 {
 	instanceIndex, _ := strconv.ParseInt(pod.Labels["index"], 10, 32)
 	return int32(instanceIndex)
+}
+
+// IsPodBeingVoluntarilyDisrupted identifies a Pod for which Kubernetes has
+// started a voluntary disruption, such as an eviction during node drain.
+// A Pod in this state must not be selected as the failover target even while
+// its container status still reports Ready.
+func IsPodBeingVoluntarilyDisrupted(pod core.Pod) bool {
+	if pod.DeletionTimestamp == nil {
+		return false
+	}
+
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == core.DisruptionTarget && condition.Status == core.ConditionTrue &&
+			(condition.Reason == "EvictionByEvictionAPI" || condition.Reason == "PreemptionByScheduler") {
+			return true
+		}
+	}
+
+	return false
 }

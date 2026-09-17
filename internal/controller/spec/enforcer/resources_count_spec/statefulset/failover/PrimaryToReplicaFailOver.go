@@ -142,18 +142,7 @@ func (r *PrimaryToReplicaFailOver) isPrimaryPodBeingVoluntarilyDisrupted() bool 
 }
 
 func isVoluntaryDisruption(pod core.Pod) bool {
-	if pod.DeletionTimestamp == nil {
-		return false
-	}
-
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == core.DisruptionTarget && condition.Status == core.ConditionTrue &&
-			(condition.Reason == "EvictionByEvictionAPI" || condition.Reason == "PreemptionByScheduler") {
-			return true
-		}
-	}
-
-	return false
+	return statefulset.IsPodBeingVoluntarilyDisrupted(pod)
 }
 
 func (r *PrimaryToReplicaFailOver) logPrimaryPodDrainFailover() {
