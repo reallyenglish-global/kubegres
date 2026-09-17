@@ -88,7 +88,9 @@ var _ = BeforeSuite(func() {
 	cfg, err := testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
-	cfg.Timeout = 2 * time.Hour
+	// Keep individual Kubernetes API requests bounded so an unavailable API server
+	// cannot block an Eventually assertion past its test timeout.
+	cfg.Timeout = 30 * time.Second
 
 	err = postgresv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
