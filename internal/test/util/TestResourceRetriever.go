@@ -33,7 +33,10 @@ import (
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 	"reactive-tech.io/kubegres/internal/test/resourceConfigs"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
 )
+
+const resourceRetrievalTimeout = 30 * time.Second
 
 type TestResourceRetriever struct {
 	client    client.Client
@@ -126,13 +129,15 @@ func (r *TestResourceRetriever) GetKubegresPvcByKubegresName(kubegresName string
 		client.InNamespace(r.namespace),
 		client.MatchingLabels{"app": kubegresName},
 	}
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), resourceRetrievalTimeout)
+	defer cancel()
 	err := r.client.List(ctx, list, opts...)
 	return list, err
 }
 
 func (r *TestResourceRetriever) getResource(resourceNameToRetrieve string, resourceToRetrieve client.Object) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), resourceRetrievalTimeout)
+	defer cancel()
 	lookupKey := types.NamespacedName{Name: resourceNameToRetrieve, Namespace: r.namespace}
 	return r.client.Get(ctx, lookupKey, resourceToRetrieve)
 }
@@ -233,7 +238,8 @@ func (r *TestResourceRetriever) GetKubegresResourcesByName(kubegresName string) 
 }
 
 func (r *TestResourceRetriever) getResourcesList(kubegresName string, resourceTypeToRetrieve client.ObjectList) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), resourceRetrievalTimeout)
+	defer cancel()
 	opts := []client.ListOption{
 		client.InNamespace(r.namespace),
 		client.MatchingLabels{"app": kubegresName},
