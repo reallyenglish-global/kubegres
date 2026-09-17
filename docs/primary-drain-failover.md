@@ -25,6 +25,8 @@ The feature is opt-in and does not treat ordinary Pod deletion as a drain. It re
 
 The external node-upgrade controller must still move and verify the replica before allowing the primary node to be disrupted. `onPrimaryPodDrain` is a database-side safety net and failover trigger; it is not a replacement for checking replication lag, fencing the old primary, or verifying application reconnects.
 
+Kubegres does not initiate node drain or restart a replica as part of this feature. The external controller owns that sequence and must wait for the replica to become Ready and streaming before requesting or permitting the primary disruption.
+
 Do not enable this with only one database instance. If no Ready replica exists, Kubegres logs the existing no-replica failover condition and does not promote anything.
 
 ## PDB and ordered migration
