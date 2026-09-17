@@ -50,7 +50,6 @@ func (r *KindTestClusterUtil) StartCluster() {
 
 	if r.isClusterRunning() {
 		log.Println("Cluster is already running. No need to restart it.")
-		r.installOperator()
 		return
 	}
 
@@ -71,7 +70,6 @@ func (r *KindTestClusterUtil) StartCluster() {
 		log.Fatal("Unable to execute the command 'kind create cluster --name "+clusterName+" --config "+clusterConfigFilePath+"'", err)
 	} else {
 		log.Println("CLUSTER STARTED")
-		r.installOperator()
 	}
 }
 
@@ -123,39 +121,7 @@ func (r *KindTestClusterUtil) isClusterRunning() bool {
 	return false
 }
 
-func (r *KindTestClusterUtil) installOperator() bool {
-
-	log.Println("Installing Kubegres operator in Cluster")
-
-	makeFilePath := r.getMakeFilePath()
-	makeFileFolder := r.getMakeFileFolder(makeFilePath)
-	log.Println("Running 'make install -f " + makeFilePath + " -C " + makeFileFolder + "'")
-
-	// -C /home/alex/source/kubegres
-
-	makeExecPath, err := exec.LookPath("make")
-	if err != nil {
-		log.Fatal("We cannot find the executable 'make'. " +
-			"Make sure 'make' is installed and the executable 'make' " +
-			"is in the classpath before running the tests.")
-	}
-
-	var out bytes.Buffer
-	cmdMakeInstallClusters := &exec.Cmd{
-		Path:   makeExecPath,
-		Args:   []string{makeExecPath, "install", "-f", makeFilePath, "-C", makeFileFolder},
-		Stdout: &out,
-		Stderr: os.Stdout,
-	}
-
-	err = cmdMakeInstallClusters.Run()
-	if err != nil {
-		log.Fatal("Unable to execute the command 'make install -f "+makeFilePath+" -C "+makeFileFolder+"'", err)
-		return false
-	}
-
-	return true
-}
+// envtest installs CRDs in BeforeSuite; do not rebuild/install a second time.
 
 func (r *KindTestClusterUtil) getClusterConfigFilePath() string {
 	fileAbsolutePath, err := filepath.Abs("util/kindcluster/kind-cluster-config.yaml")
@@ -163,16 +129,4 @@ func (r *KindTestClusterUtil) getClusterConfigFilePath() string {
 		log.Fatal("Error while trying to get the absolute-path of 'kind-cluster-config.yaml': ", err)
 	}
 	return fileAbsolutePath
-}
-
-func (r *KindTestClusterUtil) getMakeFilePath() string {
-	fileAbsolutePath, err := filepath.Abs("../../Makefile")
-	if err != nil {
-		log.Fatal("Error while trying to get the absolute-path of 'MakeFile': ", err)
-	}
-	return fileAbsolutePath
-}
-
-func (r *KindTestClusterUtil) getMakeFileFolder(makeFilePath string) string {
-	return filepath.Dir(makeFilePath)
 }

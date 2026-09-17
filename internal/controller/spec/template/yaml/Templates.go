@@ -408,10 +408,10 @@ spec:
               command:
                 - sh
                 - -c
-                - exec pg_isready -U $POSTGRES_USER -h $POD_IP
-            failureThreshold: 15
+                - exec pg_isready -U postgres -h $POD_IP
+            failureThreshold: 180
             initialDelaySeconds: 10
-            periodSeconds: 60
+            periodSeconds: 5
             successThreshold: 1
 
           livenessProbe:
@@ -574,10 +574,10 @@ spec:
               command:
                 - sh
                 - -c
-                - exec pg_isready -U $POSTGRES_USER -h $POD_IP
-            failureThreshold: 15
+                - exec pg_isready -U postgres -h $POD_IP
+            failureThreshold: 180
             initialDelaySeconds: 10
-            periodSeconds: 60
+            periodSeconds: 5
             successThreshold: 1
 
           livenessProbe:

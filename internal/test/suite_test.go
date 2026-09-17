@@ -21,9 +21,12 @@ limitations under the License.
 package test
 
 import (
+	"context"
 	"fmt"
 	"k8s.io/client-go/tools/record"
 	"log"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"reactive-tech.io/kubegres/internal/controller"
 	util2 "reactive-tech.io/kubegres/internal/test/util"
@@ -88,7 +91,9 @@ var _ = BeforeSuite(func() {
 	cfg, err := testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
-	cfg.Timeout = 2 * time.Hour
+	// Keep individual Kubernetes API requests bounded so an unavailable API server
+	// cannot block an Eventually assertion past its test timeout.
+	cfg.Timeout = 30 * time.Second
 
 	err = postgresv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
@@ -126,11 +131,24 @@ var _ = BeforeSuite(func() {
 	log.Println("Waiting for Kubernetes to start")
 	log.Println("Kubernetes has started")
 
-	k8sClientTest = k8sManager.GetClient()
+	// Keep test reads on the direct client created above. The manager client is
+	// cache-backed and can block indefinitely when its informer cache stalls.
 	Expect(k8sClientTest).ToNot(BeNil())
 
 	log.Print("END OF: BeforeSuite")
 
+})
+
+// Run before AfterEach resource deletion, so the failing state is retained.
+var _ = JustAfterEach(func() {
+	if !CurrentSpecReport().Failed() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	dest := filepath.Join("..", "..", "artifacts", "failures", fmt.Sprint(time.Now().UnixNano()))
+	output, err := exec.CommandContext(ctx, "python3", "../../hack/collect_test_diagnostics.py", dest).CombinedOutput()
+	fmt.Fprintf(GinkgoWriter, "Failure diagnostics: %s (%v)\n%s", dest, err, output)
 })
 
 var _ = AfterSuite(func() {
@@ -144,7 +162,9 @@ var _ = AfterSuite(func() {
 
 	time.Sleep(5 * time.Second)
 
-	kindCluster.DeleteCluster()
+	if os.Getenv("KUBEGRES_KEEP_TEST_CLUSTER") != "true" {
+		kindCluster.DeleteCluster()
+	}
 
 	log.Print("END OF: Suite AfterSuite")
 })

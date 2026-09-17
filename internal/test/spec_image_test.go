@@ -33,7 +33,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Setting Kubegres spec 'image'", func() {
+var _ = Describe("Setting Kubegres spec 'image'", Label("database-specs", "shard-12"), func() {
 
 	var test = SpecImageTest{}
 

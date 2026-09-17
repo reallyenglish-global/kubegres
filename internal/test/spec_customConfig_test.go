@@ -36,7 +36,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Setting Kubegres specs 'customConfig'", func() {
+var _ = Describe("Setting Kubegres specs 'customConfig'", Label("storage-config", "shard-2"), func() {
 
 	var test = SpecCustomConfigTest{}
 

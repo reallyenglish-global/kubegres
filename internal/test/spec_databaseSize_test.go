@@ -33,7 +33,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Setting Kubegres specs 'database.size'", func() {
+var _ = Describe("Setting Kubegres specs 'database.size'", Label("database-specs", "shard-9"), func() {
 
 	var test = SpecDatabaseSizeTest{}
 

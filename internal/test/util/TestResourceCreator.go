@@ -27,8 +27,10 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	postgresv1 "reactive-tech.io/kubegres/api/v1"
@@ -217,12 +219,25 @@ func (r *TestResourceCreator) DeleteResource(resourceToDelete client.Object, res
 func (r *TestResourceCreator) DeleteAllTestResources(resourceNamesToNotDelete ...string) {
 
 	log.Println("Deleting all resources created during tests")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	var targets []client.Object
+	deleteTarget := func(obj client.Object) {
+		if r.doesArrayContain(obj.GetName(), resourceNamesToNotDelete...) {
+			return
+		}
+		targets = append(targets, obj.DeepCopyObject().(client.Object))
+		err := r.client.Delete(ctx, obj)
+		if !apierrors.IsNotFound(err) {
+			gomega.Expect(err).To(gomega.Succeed())
+		}
+	}
 
 	configMapsList := &v1.ConfigMapList{}
 	r.searchList(configMapsList)
 	for _, resourceToDelete := range configMapsList.Items {
 		if !r.doesArrayContain(resourceToDelete.Name, resourceNamesToNotDelete...) {
-			r.DeleteResource(&resourceToDelete, resourceToDelete.Name)
+			deleteTarget(&resourceToDelete)
 		}
 	}
 
@@ -230,7 +245,7 @@ func (r *TestResourceCreator) DeleteAllTestResources(resourceNamesToNotDelete ..
 	r.searchList(servicesList)
 	for _, resourceToDelete := range servicesList.Items {
 		if !r.doesArrayContain(resourceToDelete.Name, resourceNamesToNotDelete...) {
-			r.DeleteResource(&resourceToDelete, resourceToDelete.Name)
+			deleteTarget(&resourceToDelete)
 		}
 	}
 
@@ -238,7 +253,7 @@ func (r *TestResourceCreator) DeleteAllTestResources(resourceNamesToNotDelete ..
 	r.searchList(pvcList)
 	for _, resourceToDelete := range pvcList.Items {
 		if !r.doesArrayContain(resourceToDelete.Name, resourceNamesToNotDelete...) {
-			r.DeleteResource(&resourceToDelete, resourceToDelete.Name)
+			deleteTarget(&resourceToDelete)
 		}
 	}
 
@@ -246,12 +261,24 @@ func (r *TestResourceCreator) DeleteAllTestResources(resourceNamesToNotDelete ..
 	r.searchList(kubegresList)
 	for _, resourceToDelete := range kubegresList.Items {
 
+		if r.doesArrayContain(resourceToDelete.Name, resourceNamesToNotDelete...) {
+			continue
+		}
+		// Capture dependants before deleting their owner so cleanup cannot race GC.
+		for _, list := range []client.ObjectList{&v1.PodList{}, &appsv1.StatefulSetList{}} {
+			gomega.Expect(r.client.List(ctx, list, client.InNamespace(r.namespace), client.MatchingLabels{"app": resourceToDelete.Name})).To(gomega.Succeed())
+			objects, err := meta.ExtractList(list)
+			gomega.Expect(err).To(gomega.Succeed())
+			for _, obj := range objects {
+				targets = append(targets, obj.(client.Object))
+			}
+		}
 		kubegresPvcList, err := r.resourceRetriever.GetKubegresPvcByKubegresName(resourceToDelete.Name)
-		r.DeleteResource(&resourceToDelete, resourceToDelete.Name)
+		deleteTarget(&resourceToDelete)
 
 		if err == nil {
 			for _, pvcToDelete := range kubegresPvcList.Items {
-				r.DeleteResource(&pvcToDelete, pvcToDelete.Name)
+				deleteTarget(&pvcToDelete)
 			}
 		} else {
 			log.Println("No PVC found for kubegres resource '" + resourceToDelete.Name + "'")
@@ -259,8 +286,8 @@ func (r *TestResourceCreator) DeleteAllTestResources(resourceNamesToNotDelete ..
 		}
 	}
 
-	log.Println("Deleted all resources created during tests. Waiting for 30 seconds...")
-	time.Sleep(30 * time.Second)
+	gomega.Expect(waitForDeleted(ctx, r.client, targets, time.Second)).To(gomega.Succeed())
+	log.Println("Test resource cleanup complete")
 }
 
 func (r *TestResourceCreator) doesArrayContain(valueToSearch string, resourceNamesToNotDelete ...string) bool {
@@ -320,6 +347,7 @@ func (r *TestResourceCreator) searchList(listToSearch client.ObjectList) {
 		client.InNamespace(r.namespace),
 		client.MatchingLabels{"environment": "acceptancetesting"},
 	}
-	ctx := context.Background()
-	_ = r.client.List(ctx, listToSearch, opts...)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	gomega.Expect(r.client.List(ctx, listToSearch, opts...)).To(gomega.Succeed())
 }
