@@ -3,7 +3,7 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
-    image: kindest/node:v1.35.0
+    image: kindest/node:v1.36.1
     extraPortMappings:
       - containerPort: 30007
         hostPort: 30007
@@ -12,10 +12,10 @@ nodes:
         hostPort: 30008
         protocol: TCP
   - role: worker
-    image: kindest/node:v1.35.0
+    image: kindest/node:v1.36.1
   - role: worker
-    image: kindest/node:v1.35.0
+    image: kindest/node:v1.36.1
   - role: worker
-    image: kindest/node:v1.35.0
+    image: kindest/node:v1.36.1
   - role: worker
-    image: kindest/node:v1.35.0
+    image: kindest/node:v1.36.1
