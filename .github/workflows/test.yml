@@ -31,7 +31,27 @@ jobs:
 
       - name: Run Tests
         run: make test
-        timeout-minutes: 600
+        timeout-minutes: 60
+
+      - name: Collect Kubernetes diagnostics
+        if: always()
+        run: |
+          mkdir -p artifacts/kubernetes
+          kubectl get pods -A -o wide > artifacts/kubernetes/pods.txt || true
+          kubectl get statefulsets -A > artifacts/kubernetes/statefulsets.txt || true
+          kubectl get pvc -A > artifacts/kubernetes/pvcs.txt || true
+          kubectl get kubegres -A > artifacts/kubernetes/kubegres.txt || true
+          kubectl get events -A --sort-by=.lastTimestamp > artifacts/kubernetes/events.txt || true
+          kubectl describe pods -A > artifacts/kubernetes/pod-descriptions.txt || true
+          kubectl describe statefulsets -A > artifacts/kubernetes/statefulset-descriptions.txt || true
+
+      - name: Upload Kubernetes diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubegres-kubernetes-diagnostics
+          path: artifacts/kubernetes
+          if-no-files-found: ignore
 
       - name: Delete Kind cluster (cleanup)
         if: always()
