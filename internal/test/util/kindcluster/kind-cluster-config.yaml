@@ -1,6 +1,7 @@
 # 5 nodes (4 workers) cluster config
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+image: kindest/node:v1.32.0
 nodes:
   - role: control-plane
     extraPortMappings:
