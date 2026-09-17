@@ -59,9 +59,11 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
+GINKGO_LABEL_FILTER ?=
+
 .PHONY: test
 test: build envtest ## Run tests.
-	go test ./internal/test -run TestAPIs -v -test.timeout 45m --ginkgo.timeout=45m --ginkgo.fail-fast
+	go test ./internal/test -run TestAPIs -v -test.timeout 45m --ginkgo.timeout=45m --ginkgo.fail-fast --ginkgo.label-filter="$(GINKGO_LABEL_FILTER)"
 	#KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 # TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.

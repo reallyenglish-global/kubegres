@@ -32,7 +32,7 @@ import (
 	"time"
 )
 
-var _ = Describe("We set the wal-level to 'logical' and simulate when Primary instance is not available then recovery/failover works", func() {
+var _ = Describe("We set the wal-level to 'logical' and simulate when Primary instance is not available then recovery/failover works", Label("core-failover"), func() {
 
 	var test = PostgresConfWalLevelLogicalTest{}
 

@@ -33,7 +33,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Setting Kubegres spec 'scheduler.tolerations'", func() {
+var _ = Describe("Setting Kubegres spec 'scheduler.tolerations'", Label("scheduling-metadata"), func() {
 
 	var test = SpecTolerationsTest{}
 

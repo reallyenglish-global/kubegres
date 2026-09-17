@@ -38,7 +38,7 @@ const customAnnotation1Value = "enabled"
 const customAnnotation2Key = "toto.io/test"
 const customAnnotation2Value = "disabled"
 
-var _ = Describe("Creating Kubegres with custom annotations", func() {
+var _ = Describe("Creating Kubegres with custom annotations", Label("scheduling-metadata"), func() {
 
 	var test = CustomAnnotationTest{}
 

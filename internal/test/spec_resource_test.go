@@ -36,7 +36,7 @@ import (
 	postgresv1 "reactive-tech.io/kubegres/api/v1"
 )
 
-var _ = Describe("Setting Kubegres spec 'resource'", func() {
+var _ = Describe("Setting Kubegres spec 'resource'", Label("database-specs"), func() {
 
 	var test = SpecResourceTest{}
 

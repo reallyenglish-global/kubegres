@@ -8,8 +8,16 @@ on:
 
 jobs:
   test:
-    name: Run Kubegres Tests in Kind
+    name: Run Kubegres Tests (${{ matrix.group }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - core-failover
+          - database-specs
+          - storage-config
+          - scheduling-metadata
 
     steps:
       - name: Checkout code
@@ -30,6 +38,8 @@ jobs:
         run: echo "KUBECONFIG=${HOME}/.kube/config" >> "$GITHUB_ENV"
 
       - name: Run Tests
+        env:
+          GINKGO_LABEL_FILTER: ${{ matrix.group }}
         run: make test
         timeout-minutes: 60
 
@@ -49,7 +59,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: kubegres-kubernetes-diagnostics
+          name: kubegres-kubernetes-diagnostics-${{ matrix.group }}
           path: artifacts/kubernetes
           if-no-files-found: ignore
 

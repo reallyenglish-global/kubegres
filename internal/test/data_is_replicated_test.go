@@ -32,7 +32,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Checking changes in Primary DB is replicated in Replica DBs", func() {
+var _ = Describe("Checking changes in Primary DB is replicated in Replica DBs", Label("core-failover"), func() {
 
 	var test = DataIsReplicatedTest{}
 

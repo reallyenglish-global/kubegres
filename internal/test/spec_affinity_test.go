@@ -35,7 +35,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Setting Kubegres spec 'scheduler.affinity'", func() {
+var _ = Describe("Setting Kubegres spec 'scheduler.affinity'", Label("scheduling-metadata"), func() {
 
 	var test = SpecAffinityTest{}
 

@@ -41,7 +41,7 @@ const customEnvVarValue = "postgreSqlPower"
 const scheduleBackupEveryMin = "*/1 * * * *"
 const scheduleBackupEvery2Mins = "*/2 * * * *"
 
-var _ = Describe("Setting Kubegres specs 'backup.*'", func() {
+var _ = Describe("Setting Kubegres specs 'backup.*'", Label("storage-config"), func() {
 
 	var test = SpecBackUpTest{}
 

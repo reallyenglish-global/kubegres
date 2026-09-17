@@ -18,7 +18,7 @@ import (
 	v1 "reactive-tech.io/kubegres/api/v1"
 )
 
-var _ = Describe("Setting Kubegres spec 'containerSecurityContext'", func() {
+var _ = Describe("Setting Kubegres spec 'containerSecurityContext'", Label("scheduling-metadata"), func() {
 	var test = SpeccontainerSecurityContextTest{}
 	BeforeEach(func() {
 		//Skip("Temporarily skipping test")

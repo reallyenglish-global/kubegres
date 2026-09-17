@@ -33,7 +33,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Setting Kubegres specs 'database.storageClassName'", func() {
+var _ = Describe("Setting Kubegres specs 'database.storageClassName'", Label("storage-config"), func() {
 
 	var test = SpecDatabaseStorageClassTest{}
 

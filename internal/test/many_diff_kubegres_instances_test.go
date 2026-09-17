@@ -38,7 +38,7 @@ const (
 	kubegresTwo = "kubegres-two"
 )
 
-var _ = Describe("Testing when there are 2 different Kubegres instances running in same namespace", func() {
+var _ = Describe("Testing when there are 2 different Kubegres instances running in same namespace", Label("scheduling-metadata"), func() {
 
 	var test = ManyDifferentKubegresInstancesTest{}
 

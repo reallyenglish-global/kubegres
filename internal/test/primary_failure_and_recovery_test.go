@@ -32,7 +32,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Primary instances is not available, checking recovery works", func() {
+var _ = Describe("Primary instances is not available, checking recovery works", Label("core-failover"), func() {
 
 	var test = PrimaryFailureAndRecoveryTest{}
 

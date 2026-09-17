@@ -32,7 +32,7 @@ import (
 	"time"
 )
 
-var _ = Describe("Primary instances is not available, when failover is disabled checking NO failover should be triggered", func() {
+var _ = Describe("Primary instances is not available, when failover is disabled checking NO failover should be triggered", Label("core-failover"), func() {
 
 	var test = SpecFailoverIsDisabledTest{}
 

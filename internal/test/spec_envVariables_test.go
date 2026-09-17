@@ -33,7 +33,7 @@ import (
 	"reactive-tech.io/kubegres/internal/test/util/testcases"
 )
 
-var _ = Describe("Setting Kubegres spec 'env.*'", func() {
+var _ = Describe("Setting Kubegres spec 'env.*'", Label("database-specs"), func() {
 
 	var test = SpecEnVariablesTest{}
 
