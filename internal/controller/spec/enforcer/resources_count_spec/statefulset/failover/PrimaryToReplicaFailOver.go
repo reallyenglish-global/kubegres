@@ -156,7 +156,12 @@ func (r *PrimaryToReplicaFailOver) isPrimaryDbReady() bool {
 }
 
 func (r *PrimaryToReplicaFailOver) isThereReadyReplica() bool {
-	return r.resourcesStates.StatefulSets.Replicas.NbreReady > 0
+	for _, replica := range r.resourcesStates.StatefulSets.Replicas.All.GetAllSortedByInstanceIndex() {
+		if replica.IsReadyForFailover() {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *PrimaryToReplicaFailOver) isAutomaticFailoverDisabled() bool {
@@ -234,7 +239,7 @@ func (r *PrimaryToReplicaFailOver) selectReplicaToPromote() (statefulset.Statefu
 	}
 
 	for _, statefulSetWrapper := range r.resourcesStates.StatefulSets.Replicas.All.GetAllSortedByInstanceIndex() {
-		if statefulSetWrapper.IsReady {
+		if statefulSetWrapper.IsReadyForFailover() {
 			return statefulSetWrapper, nil
 		}
 	}
@@ -249,7 +254,7 @@ func (r *PrimaryToReplicaFailOver) manuallySelectReplicaToPromote() (statefulset
 	r.logManualFailoverIsRequested()
 
 	for _, statefulSetWrapper := range r.resourcesStates.StatefulSets.Replicas.All.GetAllSortedByInstanceIndex() {
-		if statefulSetWrapper.IsReady && statefulSetWrapper.InstanceIndex == replicaInstanceIndexToPromote {
+		if statefulSetWrapper.IsReadyForFailover() && statefulSetWrapper.InstanceIndex == replicaInstanceIndexToPromote {
 			return statefulSetWrapper, nil
 		}
 	}
