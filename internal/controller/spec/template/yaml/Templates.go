@@ -408,7 +408,7 @@ spec:
               command:
                 - sh
                 - -c
-                - exec pg_isready -U $POSTGRES_USER -h $POD_IP
+                - exec pg_isready -U postgres -h $POD_IP
             failureThreshold: 15
             initialDelaySeconds: 10
             periodSeconds: 60
@@ -574,7 +574,7 @@ spec:
               command:
                 - sh
                 - -c
-                - exec pg_isready -U $POSTGRES_USER -h $POD_IP
+                - exec pg_isready -U postgres -h $POD_IP
             failureThreshold: 15
             initialDelaySeconds: 10
             periodSeconds: 60
