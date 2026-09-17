@@ -99,3 +99,15 @@ func TestDeletePrimaryStatefulSetReturnsDeleteError(t *testing.T) {
 		t.Fatalf("deletePrimaryStatefulSet() error = %v, want %v", err, wantErr)
 	}
 }
+
+func TestDeletePrimaryStatefulSetTreatsMissingPrimaryAsAlreadyDeleted(t *testing.T) {
+	failover := PrimaryToReplicaFailOver{
+		resourcesStates: states.ResourcesStates{
+			StatefulSets: statefulset.StatefulSetsStates{},
+		},
+	}
+
+	if err := failover.deletePrimaryStatefulSet(); err != nil {
+		t.Fatalf("deletePrimaryStatefulSet() error = %v, want nil", err)
+	}
+}

@@ -23,6 +23,7 @@ package failover
 import (
 	"errors"
 	core "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 	operation2 "reactive-tech.io/kubegres/internal/controller/operation"
@@ -345,6 +346,9 @@ func (r *PrimaryToReplicaFailOver) activateOperationFailingOver(newPrimary state
 func (r *PrimaryToReplicaFailOver) deletePrimaryStatefulSet() error {
 
 	statefulSetToDelete := r.resourcesStates.StatefulSets.Primary.StatefulSet
+	if statefulSetToDelete.Name == "" {
+		return nil
+	}
 	r.kubegresContext.Log.Info("FailOver: Deleting the failing Primary StatefulSet.",
 		"Primary name", statefulSetToDelete.Name)
 
@@ -353,6 +357,10 @@ func (r *PrimaryToReplicaFailOver) deletePrimaryStatefulSet() error {
 		r.kubegresContext.Log.InfoEvent("FailOverPrimaryDeleted",
 			"Deleted the failing Primary StatefulSet.",
 			"Primary name", statefulSetToDelete.Name)
+		return nil
+	}
+	if apierrors.IsNotFound(err) {
+		return nil
 	}
 	return err
 }
