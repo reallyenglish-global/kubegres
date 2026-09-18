@@ -30,9 +30,11 @@ type KubegresDatabase struct {
 }
 
 type KubegresBackUp struct {
-	Schedule    string `json:"schedule,omitempty"`
-	VolumeMount string `json:"volumeMount,omitempty"`
-	PvcName     string `json:"pvcName,omitempty"`
+	Schedule       string `json:"schedule,omitempty"`
+	VolumeMount    string `json:"volumeMount,omitempty"`
+	PvcName        string `json:"pvcName,omitempty"`
+	ArchiveCommand string `json:"archiveCommand,omitempty"`
+	RestoreCommand string `json:"restoreCommand,omitempty"`
 	// Size requests a generic ephemeral PVC for the backup Pod when PvcName is
 	// empty or names a PVC that does not exist. The ephemeral PVC is deleted
 	// with the Pod, so backup scripts must copy data to durable storage.
