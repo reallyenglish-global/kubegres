@@ -30,9 +30,11 @@ type KubegresDatabase struct {
 }
 
 type KubegresBackUp struct {
-	Schedule    string `json:"schedule,omitempty"`
-	VolumeMount string `json:"volumeMount,omitempty"`
-	PvcName     string `json:"pvcName,omitempty"`
+	Schedule           string `json:"schedule,omitempty"`
+	VolumeMount        string `json:"volumeMount,omitempty"`
+	PvcName            string `json:"pvcName,omitempty"`
+	ArchiveCommand     string `json:"archiveCommand,omitempty"`
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 type KubegresFailover struct {
