@@ -6,6 +6,8 @@ stateful-set's life-cycle and data replication could be with Kubernetes.
 
 See [`docs/primary-drain-failover.md`](docs/primary-drain-failover.md) for the opt-in `spec.failover.onPrimaryPodDrain` feature.
 
+See [`docs/pitr-archive.md`](docs/pitr-archive.md) for custom WAL archive commands and archive-specific ServiceAccount configuration.
+
 **Features**
 
 * It can manage one or many clusters of Postgres instances.

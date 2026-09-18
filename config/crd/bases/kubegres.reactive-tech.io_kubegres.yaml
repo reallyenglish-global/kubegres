@@ -40,9 +40,13 @@ spec:
             properties:
               backup:
                 properties:
+                  archiveCommand:
+                    type: string
                   pvcName:
                     type: string
                   schedule:
+                    type: string
+                  serviceAccountName:
                     type: string
                   volumeMount:
                     type: string
