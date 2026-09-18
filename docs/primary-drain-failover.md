@@ -17,7 +17,7 @@ spec:
 2. Kubernetes marks the primary Pod with a deletion timestamp and `DisruptionTarget` condition.
 3. Kubegres uses its existing failover state machine to select and promote a Ready replica.
 4. The primary Service is updated by the existing role/service reconciliation.
-5. The old primary StatefulSet is rebuilt as a replica by the existing replica-count reconciliation.
+5. The former primary StatefulSet is replaced by a new replica through the existing replica-count reconciliation.
 
 The feature is opt-in and does not treat ordinary Pod deletion as a drain. It recognizes the Kubernetes voluntary-disruption reasons `EvictionByEvictionAPI` and `PreemptionByScheduler`.
 

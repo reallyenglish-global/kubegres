@@ -73,7 +73,7 @@ var _ = Describe("Primary voluntary disruption failover", Label("core-failover",
 			}
 
 			newPrimaryPodName, newReplicaPodName := podNamesByRole(resources)
-			return newPrimaryPodName == replicaPodName && newReplicaPodName == primaryPodName
+			return newPrimaryPodName == replicaPodName && newReplicaPodName != replicaPodName
 		}, 10*time.Minute, 5*time.Second).Should(BeTrue())
 	})
 })
