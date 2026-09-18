@@ -40,6 +40,7 @@ const customEnvVarName = "MY_CUSTOM_ENV_VAR"
 const customEnvVarValue = "postgreSqlPower"
 const scheduleBackupEveryMin = "*/1 * * * *"
 const scheduleBackupEvery2Mins = "*/2 * * * *"
+const customBackupImage = "registry.example.com/postgres-backup:latest"
 
 var _ = Describe("Setting Kubegres specs 'backup.*'", Label("storage-config", "shard-1"), func() {
 
@@ -157,6 +158,7 @@ var _ = Describe("Setting Kubegres specs 'backup.*'", Label("storage-config", "s
 			log.Print("START OF: Test 'GIVEN new Kubegres is created with spec 'backup.schedule' AND 'backup.volumeMount' AND 'backup.pvcName' and the given PVC is deployed")
 
 			test.givenNewKubegresSpecIsSetTo(ctx.BaseConfigMapName, scheduleBackupEveryMin, resourceConfigs2.BackUpPvcResourceName, "/tmp/my-kubegres", 3)
+			test.kubegresResource.Spec.Backup.Image = customBackupImage
 			test.givenKubegresEnvVarIsSetTo(customEnvVarName, customEnvVarValue)
 			test.givenKubegresAnnotationIsSetTo(customAnnotationKey, customAnnotationValue)
 
@@ -165,6 +167,7 @@ var _ = Describe("Setting Kubegres specs 'backup.*'", Label("storage-config", "s
 			test.thenPodsStatesShouldBe(1, 2)
 
 			test.thenCronJobExistsWithSpec(ctx.BaseConfigMapName, scheduleBackupEveryMin, resourceConfigs2.BackUpPvcResourceName, "/tmp/my-kubegres")
+			test.thenCronJobContainerImageIs(customBackupImage)
 			test.thenCronJobSpecShouldHaveEnvVar(customEnvVarName, customEnvVarValue)
 			test.thenCronJobSpecShouldHaveAnnotation(customAnnotationKey, customAnnotationValue)
 
@@ -432,6 +435,20 @@ func (r *SpecBackUpTest) thenCronJobExistsWithSpec(expectedConfigMapName,
 
 		return true
 
+	}, time.Second*10, time.Second*5).Should(BeTrue())
+}
+
+func (r *SpecBackUpTest) thenCronJobContainerImageIs(expectedImage string) bool {
+	return Eventually(func() bool {
+		kubegresResources, err := r.resourceRetriever.GetKubegresResources()
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false
+		}
+		backUpCronJob := kubegresResources.BackUpCronJob
+		if backUpCronJob.Name == "" {
+			return false
+		}
+		return backUpCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image == expectedImage
 	}, time.Second*10, time.Second*5).Should(BeTrue())
 }
 

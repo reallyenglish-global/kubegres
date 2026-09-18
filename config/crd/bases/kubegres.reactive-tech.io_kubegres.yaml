@@ -40,6 +40,11 @@ spec:
             properties:
               backup:
                 properties:
+                  image:
+                    description: |-
+                      Image is the container image used by the backup CronJob. When empty,
+                      the database image is used for backwards compatibility.
+                    type: string
                   pvcName:
                     type: string
                   schedule:

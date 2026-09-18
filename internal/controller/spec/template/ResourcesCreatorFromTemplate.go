@@ -158,6 +158,9 @@ func (r *ResourcesCreatorFromTemplate) CreateBackUpCronJob(configMapNameForBackU
 
 	backUpCronJobContainer := &backUpCronJobSpec.Containers[0]
 	backUpCronJobContainer.Image = postgres.Spec.Image
+	if backupSpec.Image != "" {
+		backUpCronJobContainer.Image = backupSpec.Image
+	}
 	backUpCronJobContainer.VolumeMounts[0].MountPath = backupSpec.VolumeMount
 	backUpCronJobContainer.Env[0].ValueFrom = r.getEnvVar(ctx.EnvVarNameOfPostgresSuperUserPsw).ValueFrom
 	backUpCronJobContainer.Env[1].Value = postgres.Name
