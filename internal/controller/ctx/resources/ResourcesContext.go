@@ -207,4 +207,7 @@ func addBlockingOperationConfigs(rc *ResourcesContext) {
 	rc.BlockingOperation.AddConfig(rc.AllStatefulSetsSpecEnforcer.CreateOperationConfigForStatefulSetSpecUpdating())
 	rc.BlockingOperation.AddConfig(rc.AllStatefulSetsSpecEnforcer.CreateOperationConfigForStatefulSetSpecPodUpdating())
 	rc.BlockingOperation.AddConfig(rc.AllStatefulSetsSpecEnforcer.CreateOperationConfigForStatefulSetWaitingOnStuckPod())
+	rc.BlockingOperation.AddConfig(rc.AllStatefulSetsSpecEnforcer.CreateOperationConfigForPostgresMinorUpgradeReplica())
+	rc.BlockingOperation.AddConfig(rc.AllStatefulSetsSpecEnforcer.CreateOperationConfigForPostgresMinorUpgradeWaiting())
+	rc.BlockingOperation.AddConfig(rc.PrimaryToReplicaFailOver.CreateOperationConfigForPostgresMinorUpgradeFailover())
 }
