@@ -224,6 +224,14 @@
       "observed_median_seconds": 205.3,
       "estimated_seconds": 751.9,
       "shard": "shard-11"
+    },
+    {
+      "file": "primary_drain_failover_test.go",
+      "specs": 1,
+      "observed_samples": 0,
+      "observed_median_seconds": null,
+      "estimated_seconds": 300,
+      "shard": "shard-5"
     }
   ]
 }

@@ -23,6 +23,7 @@ package failover
 import (
 	"errors"
 	core "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 	operation2 "reactive-tech.io/kubegres/internal/controller/operation"
@@ -142,18 +143,7 @@ func (r *PrimaryToReplicaFailOver) isPrimaryPodBeingVoluntarilyDisrupted() bool 
 }
 
 func isVoluntaryDisruption(pod core.Pod) bool {
-	if pod.DeletionTimestamp == nil {
-		return false
-	}
-
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == core.DisruptionTarget && condition.Status == core.ConditionTrue &&
-			(condition.Reason == "EvictionByEvictionAPI" || condition.Reason == "PreemptionByScheduler") {
-			return true
-		}
-	}
-
-	return false
+	return statefulset.IsPodBeingVoluntarilyDisrupted(pod)
 }
 
 func (r *PrimaryToReplicaFailOver) logPrimaryPodDrainFailover() {
@@ -167,7 +157,12 @@ func (r *PrimaryToReplicaFailOver) isPrimaryDbReady() bool {
 }
 
 func (r *PrimaryToReplicaFailOver) isThereReadyReplica() bool {
-	return r.resourcesStates.StatefulSets.Replicas.NbreReady > 0
+	for _, replica := range r.resourcesStates.StatefulSets.Replicas.All.GetAllSortedByInstanceIndex() {
+		if replica.IsReadyForFailover() {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *PrimaryToReplicaFailOver) isAutomaticFailoverDisabled() bool {
@@ -245,7 +240,7 @@ func (r *PrimaryToReplicaFailOver) selectReplicaToPromote() (statefulset.Statefu
 	}
 
 	for _, statefulSetWrapper := range r.resourcesStates.StatefulSets.Replicas.All.GetAllSortedByInstanceIndex() {
-		if statefulSetWrapper.IsReady {
+		if statefulSetWrapper.IsReadyForFailover() {
 			return statefulSetWrapper, nil
 		}
 	}
@@ -260,7 +255,7 @@ func (r *PrimaryToReplicaFailOver) manuallySelectReplicaToPromote() (statefulset
 	r.logManualFailoverIsRequested()
 
 	for _, statefulSetWrapper := range r.resourcesStates.StatefulSets.Replicas.All.GetAllSortedByInstanceIndex() {
-		if statefulSetWrapper.IsReady && statefulSetWrapper.InstanceIndex == replicaInstanceIndexToPromote {
+		if statefulSetWrapper.IsReadyForFailover() && statefulSetWrapper.InstanceIndex == replicaInstanceIndexToPromote {
 			return statefulSetWrapper, nil
 		}
 	}
@@ -315,9 +310,15 @@ func (r *PrimaryToReplicaFailOver) promoteReplicaToPrimary(newPrimary statefulse
 
 func (r *PrimaryToReplicaFailOver) waitBeforePromotingReplicaToPrimary(newPrimary statefulset.StatefulSetWrapper) error {
 
-	r.deletePrimaryStatefulSet()
+	err := r.deletePrimaryStatefulSet()
+	if err != nil {
+		r.kubegresContext.Log.ErrorEvent("FailOverPrimaryDeletionErr", err,
+			"FailOver: Unable to delete the failing Primary StatefulSet.",
+			"Primary name", r.resourcesStates.StatefulSets.Primary.StatefulSet.Name)
+		return err
+	}
 
-	err := r.activateOperationWaitingBeforeFailingOver(newPrimary)
+	err = r.activateOperationWaitingBeforeFailingOver(newPrimary)
 	if err != nil {
 		r.kubegresContext.Log.ErrorEvent("FailOverOperationActivationErr", err,
 			"Error while activating a blocking operation to wait before starting the FailOver of a Primary DB.",
@@ -342,9 +343,12 @@ func (r *PrimaryToReplicaFailOver) activateOperationFailingOver(newPrimary state
 		newPrimary.InstanceIndex)
 }
 
-func (r *PrimaryToReplicaFailOver) deletePrimaryStatefulSet() {
+func (r *PrimaryToReplicaFailOver) deletePrimaryStatefulSet() error {
 
 	statefulSetToDelete := r.resourcesStates.StatefulSets.Primary.StatefulSet
+	if statefulSetToDelete.Name == "" {
+		return nil
+	}
 	r.kubegresContext.Log.Info("FailOver: Deleting the failing Primary StatefulSet.",
 		"Primary name", statefulSetToDelete.Name)
 
@@ -353,7 +357,12 @@ func (r *PrimaryToReplicaFailOver) deletePrimaryStatefulSet() {
 		r.kubegresContext.Log.InfoEvent("FailOverPrimaryDeleted",
 			"Deleted the failing Primary StatefulSet.",
 			"Primary name", statefulSetToDelete.Name)
+		return nil
 	}
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func (r *PrimaryToReplicaFailOver) logFailoverCannotHappenAsNoReplicaDeployed() {

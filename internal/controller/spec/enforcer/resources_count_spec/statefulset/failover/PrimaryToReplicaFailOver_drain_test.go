@@ -1,8 +1,16 @@
 package failover
 
 import (
+	"context"
+	"errors"
+	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "reactive-tech.io/kubegres/api/v1"
+	"reactive-tech.io/kubegres/internal/controller/ctx"
+	"reactive-tech.io/kubegres/internal/controller/states"
+	"reactive-tech.io/kubegres/internal/controller/states/statefulset"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 )
 
@@ -25,5 +33,81 @@ func TestIsVoluntaryDisruption(t *testing.T) {
 				t.Fatalf("isVoluntaryDisruption() = %v, want %v", got, tc.expected)
 			}
 		})
+	}
+}
+
+func TestSelectReplicaToPromoteSkipsDisruptedReadyReplica(t *testing.T) {
+	var replicas statefulset.StatefulSetWrappers
+	replicas.Add(statefulset.StatefulSetWrapper{
+		InstanceIndex: 1,
+		IsReady:       true,
+		Pod: statefulset.PodWrapper{
+			IsReady:                     true,
+			IsBeingVoluntarilyDisrupted: true,
+		},
+	})
+	replicas.Add(statefulset.StatefulSetWrapper{
+		InstanceIndex: 2,
+		IsReady:       true,
+		Pod:           statefulset.PodWrapper{IsReady: true},
+	})
+
+	failover := PrimaryToReplicaFailOver{
+		kubegresContext: ctx.KubegresContext{Kubegres: &v1.Kubegres{}},
+		resourcesStates: states.ResourcesStates{
+			StatefulSets: statefulset.StatefulSetsStates{
+				Replicas: statefulset.Replicas{All: replicas},
+			},
+		},
+	}
+
+	selected, err := failover.selectReplicaToPromote()
+	if err != nil {
+		t.Fatalf("selectReplicaToPromote() returned error: %v", err)
+	}
+	if selected.InstanceIndex != 2 {
+		t.Fatalf("selectReplicaToPromote() selected instance %d, want 2", selected.InstanceIndex)
+	}
+}
+
+type deleteErrorClient struct {
+	client.Client
+	err error
+}
+
+func (c deleteErrorClient) Delete(context.Context, client.Object, ...client.DeleteOption) error {
+	return c.err
+}
+
+func TestDeletePrimaryStatefulSetReturnsDeleteError(t *testing.T) {
+	wantErr := errors.New("delete failed")
+	failover := PrimaryToReplicaFailOver{
+		kubegresContext: ctx.KubegresContext{
+			Ctx:    context.Background(),
+			Client: deleteErrorClient{err: wantErr},
+		},
+		resourcesStates: states.ResourcesStates{
+			StatefulSets: statefulset.StatefulSetsStates{
+				Primary: statefulset.StatefulSetWrapper{
+					StatefulSet: appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "primary"}},
+				},
+			},
+		},
+	}
+
+	if err := failover.deletePrimaryStatefulSet(); !errors.Is(err, wantErr) {
+		t.Fatalf("deletePrimaryStatefulSet() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestDeletePrimaryStatefulSetTreatsMissingPrimaryAsAlreadyDeleted(t *testing.T) {
+	failover := PrimaryToReplicaFailOver{
+		resourcesStates: states.ResourcesStates{
+			StatefulSets: statefulset.StatefulSetsStates{},
+		},
+	}
+
+	if err := failover.deletePrimaryStatefulSet(); err != nil {
+		t.Fatalf("deletePrimaryStatefulSet() error = %v, want nil", err)
 	}
 }

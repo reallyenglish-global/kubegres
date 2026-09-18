@@ -15,7 +15,7 @@ class ReportsTest(unittest.TestCase):
     def test_real_dry_run_coverage_and_rejected_mutations(self):
         items = report_tests.specs(ROOT / 'artifacts/reports/coverage.json')
         manifest = json.loads((ROOT / 'hack/ci-shards.json').read_text())
-        self.assertEqual(report_tests.validate(items, manifest), 99)
+        self.assertEqual(report_tests.validate(items, manifest), 100)
         with self.assertRaises(ValueError):
             report_tests.validate(items[:-1], manifest)
         changed = copy.deepcopy(items)

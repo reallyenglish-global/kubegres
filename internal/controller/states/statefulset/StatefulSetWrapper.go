@@ -15,6 +15,14 @@ type StatefulSetWrapper struct {
 	Pod           PodWrapper
 }
 
+// IsReadyForFailover reports whether this StatefulSet has a ready Pod that
+// can safely be selected as a failover target. StatefulSet status can lag the
+// Pod being deleted during a voluntary disruption, so both states are
+// required here.
+func (r StatefulSetWrapper) IsReadyForFailover() bool {
+	return r.IsReady && r.Pod.IsReady && !r.Pod.IsBeingVoluntarilyDisrupted
+}
+
 type StatefulSetWrappers struct {
 	statefulSetsSortedByInstanceIndex        []StatefulSetWrapper
 	statefulSetsReverseSortedByInstanceIndex []StatefulSetWrapper

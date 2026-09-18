@@ -38,6 +38,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -55,6 +56,7 @@ var kindCluster kindcluster.KindTestClusterUtil
 
 // var cfgTest *rest.Config
 var k8sClientTest client.Client
+var k8sClientsetTest kubernetes.Interface
 var testEnv *envtest.Environment
 var eventRecorderTest util2.MockEventRecorderTestUtil
 
@@ -103,6 +105,10 @@ var _ = BeforeSuite(func() {
 	k8sClientTest, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClientTest).ToNot(BeNil())
+
+	k8sClientsetTest, err = kubernetes.NewForConfig(cfg)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(k8sClientsetTest).ToNot(BeNil())
 
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
