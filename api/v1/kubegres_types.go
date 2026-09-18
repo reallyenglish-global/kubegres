@@ -33,6 +33,9 @@ type KubegresBackUp struct {
 	Schedule    string `json:"schedule,omitempty"`
 	VolumeMount string `json:"volumeMount,omitempty"`
 	PvcName     string `json:"pvcName,omitempty"`
+	// Image is the container image used by the backup CronJob. When empty,
+	// the database image is used for backwards compatibility.
+	Image string `json:"image,omitempty"`
 }
 
 type KubegresFailover struct {

@@ -128,6 +128,16 @@ func (r *BackUpCronJobCountSpecEnforcer) hasSpecChanged() (hasSpecChanged bool) 
 		r.logSpecChange("spec.backup.pvcName")
 	}
 
+	currentImage := cronJobTemplateSpec.Containers[0].Image
+	expectedImage := kubegresBackUpSpec.Image
+	if expectedImage == "" {
+		expectedImage = r.kubegresContext.Kubegres.Spec.Image
+	}
+	if currentImage != expectedImage {
+		hasSpecChanged = true
+		r.logSpecChange("spec.backup.image")
+	}
+
 	currentCustomConfig := cronJobTemplateSpec.Volumes[1].ConfigMap.Name
 	expectedCustomConfig := r.getConfigMapNameForBackUp(r.resourcesStates.Config)
 	if currentCustomConfig != expectedCustomConfig {
