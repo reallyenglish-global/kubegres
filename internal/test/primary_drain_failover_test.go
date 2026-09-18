@@ -21,7 +21,7 @@ import (
 	util2 "reactive-tech.io/kubegres/internal/test/util"
 )
 
-var _ = Describe("Primary voluntary disruption failover", Label("core-failover", "shard-1"), func() {
+var _ = Describe("Primary voluntary disruption failover", Label("core-failover", "shard-5"), func() {
 	var resourceRetriever util2.TestResourceRetriever
 	var resourceCreator util2.TestResourceCreator
 
