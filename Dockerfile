@@ -1,5 +1,7 @@
-# Build the manager binary
-FROM golang:1.23 as builder
+# Build the manager binary for the requested target platform. The Go version
+# must remain compatible with the `go` directive in go.mod.
+ARG BUILDPLATFORM
+FROM --platform=$BUILDPLATFORM golang:1.26 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 

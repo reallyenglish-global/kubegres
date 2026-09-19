@@ -1,5 +1,8 @@
-# Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+# Image URL used by local and release image targets. The ReallyEnglish fork
+# owns this image; do not publish or deploy the upstream Reactive Tech image.
+IMAGE_REPOSITORY ?= ghcr.io/reallyenglish-global/kubegres
+VERSION ?= dev
+IMG ?= $(IMAGE_REPOSITORY):$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.36.0
 
@@ -123,25 +126,19 @@ docker-build: ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
-# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
-# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
+# PLATFORMS defines the target platforms for the manager image. To use this
+# option you need to:
 # - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
 # - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 # - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
 # To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
+PLATFORMS ?= linux/amd64,linux/arm64
 .PHONY: docker-buildx
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name kubegres-builder
-	- $(CONTAINER_TOOL) buildx use kubegres-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm kubegres-builder
-	rm Dockerfile.cross
+	$(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} .
 
 .PHONY: build-installer
-build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
+build-installer: manifests generate kustomize ## Generate a consolidated YAML with the configured image.
 	mkdir -p dist
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
@@ -160,25 +157,10 @@ install: build kustomize ## Install CRDs into the K8s cluster specified in ~/.ku
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
-LATEST ?= controller:latest
-
-.PHONY: deploy-check
-deploy-check:
-ifeq ($(IMG),$(LATEST))
-	@echo "PLEASE PROVIDE THE ARGUMENT 'IMG' WHEN RUNNING 'make deploy'. EXAMPLE OF USAGE: 'make deploy IMG=reactivetechio/kubegres:1.19'"
-	exit 1
-endif
-	@echo "RUNNING THE ACCEPTANCE TESTS AND THEN WILL DEPLOY $(IMG) INTO DOCKER HUB."
-
-## Usage: 'make deploy IMG=reactivetechio/kubegres:[version]'
-## eg: 'make deploy IMG=reactivetechio/kubegres:1.19'
-## Run acceptance tests then deploy into Docker Hub the controller as the Docker image provided in arg ${IMG}
-## and update the local file "kubegres.yaml" with the image ${IMG}
 .PHONY: deploy
-deploy: deploy-check docker-buildx kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default > kubegres.yaml
-	@echo "DEPLOYED $(IMG) INTO DOCKER HUB. UPDATED 'kubegres.yaml' WITH '$(IMG)'. YOU CAN COMMIT 'kubegres.yaml' AND CREATE A RELEASE IN GITHUB."
+deploy: kustomize ## Apply the checked-in release manifest to the K8s cluster specified in ~/.kube/config.
+	@echo "Applying kubegres.yaml; image: $$(grep -m1 'image:' kubegres.yaml | tr -s ' ')"
+	$(KUBECTL) apply -f kubegres.yaml
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.

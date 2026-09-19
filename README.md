@@ -33,9 +33,13 @@ yet robust required features to manage a cluster of PostgreSql on Kubernetes. We
 
 Among many reasons, there are [5 main ones why we recommend Kubegres](https://www.kubegres.io/#kubegres_compared).
 
-**Getting started**
+**ReallyEnglish fork: release and deployment**
 
-If you would like to install Kubegres, please read the page [Getting started](http://www.kubegres.io/doc/getting-started.html).
+This is the ReallyEnglish fork of Kubegres. Its supported operator image is `ghcr.io/reallyenglish-global/kubegres`; it does not publish or deploy `reactivetechio/kubegres`. See [our release and deployment contract](docs/release-and-deploy.md) for the required image build, manifest review, verification, and approval gates.
+
+**Upstream getting started material**
+
+The upstream [Getting started](http://www.kubegres.io/doc/getting-started.html) page remains useful for Kubegres concepts, but its installation image and release instructions are not authoritative for this fork.
 
 **Sponsor**
 
