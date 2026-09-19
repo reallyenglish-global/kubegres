@@ -51,6 +51,9 @@ func TestCronTasksEnforcerCreatesUpdatesAndDeletesManagedCronJobs(t *testing.T) 
 	if container.Image != "postgres:16" || len(container.VolumeMounts) != 2 || len(container.Env) != 3 {
 		t.Fatalf("task container did not include requested image, mounts, and merged environment: %#v", container)
 	}
+	if got := container.VolumeMounts[1]; got.Name != "kubegres-task-script" || got.MountPath != "/scripts/analyse.sh" || got.SubPath != "analyse.sh" {
+		t.Fatalf("script was not mounted as the requested ConfigMap key: %#v", got)
+	}
 	if container.Env[0].Name != "INHERITED" || container.Env[1].Value != "new" {
 		t.Fatalf("task-local environment did not override inherited environment: %#v", container.Env)
 	}
