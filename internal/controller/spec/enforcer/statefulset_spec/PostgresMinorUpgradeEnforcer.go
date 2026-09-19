@@ -55,10 +55,7 @@ func (r *AllStatefulSetsSpecEnforcer) enforcePostgresMinorUpgrade() (bool, error
 		return true, r.startPostgresMinorUpgrade(desired)
 	}
 	if r.blockingOperation.IsActiveOperationInTransition(operation2.OperationIdPostgresMinorVersionUpgrade) {
-		// The active operation contains the step that must be started next.
-		// The previously active operation may be unrelated (for example, the
-		// replica-count deployment that was running before this upgrade began).
-		switch active.StepId {
+		switch r.blockingOperation.GetPreviouslyActiveOperation().StepId {
 		case operation2.OperationStepIdPostgresUpgradeReplica:
 			f := failover.CreatePrimaryToReplicaFailOver(r.kubegresContext, r.resourcesStates, r.blockingOperation)
 			return true, f.BeginPostgresMinorUpgradeFailover()
