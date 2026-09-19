@@ -2,6 +2,10 @@
 replication and failover enabled out-of-the box. It brings simplicity when using PostgreSql considering how complex managing
 stateful-set's life-cycle and data replication could be with Kubernetes.
 
+## Scheduled maintenance tasks
+
+See [`docs/cron-tasks.md`](docs/cron-tasks.md) for independent `spec.cronTasks` CronJobs used for scheduled database maintenance. The feature is separate from, and does not change, `spec.backup`.
+
 ## Voluntary node-drain failover
 
 See [`docs/primary-drain-failover.md`](docs/primary-drain-failover.md) for the opt-in `spec.failover.onPrimaryPodDrain` feature.

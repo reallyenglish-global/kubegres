@@ -48,4 +48,13 @@ func TestConfigurationPredicates(t *testing.T) {
 	if !r.doCustomVolumeMountsHaveReservedPath() {
 		t.Fatal("reserved database path accepted")
 	}
+	if got := r.validateCronTasks([]postgresV1.KubegresCronTask{{Name: "analyse", Schedule: "0 2 * * *", Image: "postgres:16"}}); got != "" {
+		t.Fatalf("valid cron task rejected: %s", got)
+	}
+	if got := r.validateCronTasks([]postgresV1.KubegresCronTask{{Name: "analyse", Schedule: "0 2 * * *", Image: "postgres:16"}, {Name: "analyse", Schedule: "0 3 * * *", Image: "postgres:16"}}); got == "" {
+		t.Fatal("duplicate cron task accepted")
+	}
+	if got := r.validateCronTasks([]postgresV1.KubegresCronTask{{Name: "analyse", Schedule: "0 2 * * *", Image: "postgres:16", Script: &postgresV1.KubegresCronTaskScript{ConfigMapName: "scripts"}}}); got == "" {
+		t.Fatal("incomplete task script accepted")
+	}
 }

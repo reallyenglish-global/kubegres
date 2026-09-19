@@ -69,6 +69,7 @@ type ResourcesContext struct {
 	StatefulSetCountSpecEnforcer   resources_count_spec2.StatefulSetCountSpecEnforcer
 	ServicesCountSpecEnforcer      resources_count_spec2.ServicesCountSpecEnforcer
 	BackUpCronJobCountSpecEnforcer resources_count_spec2.BackUpCronJobCountSpecEnforcer
+	CronTasksCountSpecEnforcer     resources_count_spec2.CronTasksCountSpecEnforcer
 }
 
 func CreateResourcesContext(kubegres *postgresV1.Kubegres,
@@ -148,12 +149,14 @@ func addResourcesCountSpecEnforcers(rc *ResourcesContext) {
 	rc.BaseConfigMapCountSpecEnforcer = resources_count_spec2.CreateBaseConfigMapCountSpecEnforcer(rc.KubegresContext, rc.ResourcesStates, rc.ResourcesCreatorFromTemplate, rc.BlockingOperation)
 	rc.ServicesCountSpecEnforcer = resources_count_spec2.CreateServicesCountSpecEnforcer(rc.KubegresContext, rc.ResourcesStates, rc.ResourcesCreatorFromTemplate)
 	rc.BackUpCronJobCountSpecEnforcer = resources_count_spec2.CreateBackUpCronJobCountSpecEnforcer(rc.KubegresContext, rc.ResourcesStates, rc.ResourcesCreatorFromTemplate)
+	rc.CronTasksCountSpecEnforcer = resources_count_spec2.CreateCronTasksCountSpecEnforcer(rc.KubegresContext)
 
 	rc.ResourcesCountSpecEnforcer = resources_count_spec2.ResourcesCountSpecEnforcer{}
 	rc.ResourcesCountSpecEnforcer.AddSpecEnforcer(&rc.BaseConfigMapCountSpecEnforcer)
 	rc.ResourcesCountSpecEnforcer.AddSpecEnforcer(&rc.StatefulSetCountSpecEnforcer)
 	rc.ResourcesCountSpecEnforcer.AddSpecEnforcer(&rc.ServicesCountSpecEnforcer)
 	rc.ResourcesCountSpecEnforcer.AddSpecEnforcer(&rc.BackUpCronJobCountSpecEnforcer)
+	rc.ResourcesCountSpecEnforcer.AddSpecEnforcer(&rc.CronTasksCountSpecEnforcer)
 }
 
 func addStatefulSetSpecEnforcers(rc *ResourcesContext) {

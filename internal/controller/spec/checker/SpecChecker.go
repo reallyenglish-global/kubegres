@@ -22,8 +22,10 @@ package checker
 
 import (
 	"errors"
+	"fmt"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	postgresV1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 	"reactive-tech.io/kubegres/internal/controller/states"
@@ -50,6 +52,11 @@ func (r *SpecChecker) CheckSpec() (SpecCheckResult, error) {
 	specCheckResult := SpecCheckResult{}
 
 	spec := &r.kubegresContext.Kubegres.Spec
+	if errMsg := r.validateCronTasks(spec.CronTasks); errMsg != "" {
+		specCheckResult.HasSpecFatalError = true
+		specCheckResult.FatalErrorMessage = r.logSpecErrMsg(errMsg)
+		return specCheckResult, nil
+	}
 	primaryStatefulSet := r.getPrimaryStatefulSet()
 	primaryStatefulSetSpec := primaryStatefulSet.StatefulSet.Spec
 	const emptyStr = ""
@@ -220,6 +227,30 @@ func (r *SpecChecker) updateKubegresSpec(specName string, specValue string) {
 
 func (r *SpecChecker) isBackUpConfigured(spec *postgresV1.KubegresSpec) bool {
 	return spec.Backup.Schedule != ""
+}
+
+func (r *SpecChecker) validateCronTasks(tasks []postgresV1.KubegresCronTask) string {
+	seen := make(map[string]struct{}, len(tasks))
+	for index, task := range tasks {
+		field := fmt.Sprintf("spec.cronTasks[%d]", index)
+		if task.Name == "" || task.Schedule == "" || task.Image == "" {
+			return field + " must define name, schedule, and image."
+		}
+		if reasons := validation.IsDNS1123Label(task.Name); len(reasons) > 0 {
+			return field + ".name must be a DNS-1123 label."
+		}
+		if _, duplicate := seen[task.Name]; duplicate {
+			return "spec.cronTasks has duplicate task name '" + task.Name + "'."
+		}
+		seen[task.Name] = struct{}{}
+		if task.ConcurrencyPolicy != "" && task.ConcurrencyPolicy != "Allow" && task.ConcurrencyPolicy != "Forbid" && task.ConcurrencyPolicy != "Replace" {
+			return field + ".concurrencyPolicy must be Allow, Forbid, or Replace."
+		}
+		if task.Script != nil && (task.Script.ConfigMapName == "" || task.Script.Key == "" || task.Script.MountPath == "") {
+			return field + ".script must define configMapName, key, and mountPath."
+		}
+	}
+	return ""
 }
 
 func (r *SpecChecker) dbStorageClassDeployed() bool {
