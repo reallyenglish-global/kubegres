@@ -38,6 +38,30 @@ type KubegresBackUp struct {
 	Image string `json:"image,omitempty"`
 }
 
+// KubegresCronTaskScript mounts one ConfigMap key as a file in a CronTask container.
+type KubegresCronTaskScript struct {
+	ConfigMapName string `json:"configMapName,omitempty"`
+	Key           string `json:"key,omitempty"`
+	MountPath     string `json:"mountPath,omitempty"`
+}
+
+// KubegresCronTask defines an independent, Kubegres-owned CronJob. It is
+// intentionally separate from Backup so existing backup behaviour is unchanged.
+type KubegresCronTask struct {
+	Name                       string                  `json:"name,omitempty"`
+	Schedule                   string                  `json:"schedule,omitempty"`
+	Image                      string                  `json:"image,omitempty"`
+	Command                    []string                `json:"command,omitempty"`
+	Args                       []string                `json:"args,omitempty"`
+	Script                     *KubegresCronTaskScript `json:"script,omitempty"`
+	Env                        []v1.EnvVar             `json:"env,omitempty"`
+	Volumes                    []v1.Volume             `json:"volumes,omitempty"`
+	VolumeMounts               []v1.VolumeMount        `json:"volumeMounts,omitempty"`
+	ConcurrencyPolicy          string                  `json:"concurrencyPolicy,omitempty"`
+	SuccessfulJobsHistoryLimit *int32                  `json:"successfulJobsHistoryLimit,omitempty"`
+	FailedJobsHistoryLimit     *int32                  `json:"failedJobsHistoryLimit,omitempty"`
+}
+
 type KubegresFailover struct {
 	IsDisabled bool   `json:"isDisabled,omitempty"`
 	PromotePod string `json:"promotePod,omitempty"`
@@ -87,6 +111,7 @@ type KubegresSpec struct {
 	Failover                 KubegresFailover            `json:"failover,omitempty"`
 	PodDisruptionBudget      KubegresPodDisruptionBudget `json:"podDisruptionBudget,omitempty"`
 	Backup                   KubegresBackUp              `json:"backup,omitempty"`
+	CronTasks                []KubegresCronTask          `json:"cronTasks,omitempty"`
 	Env                      []v1.EnvVar                 `json:"env,omitempty"`
 	Scheduler                KubegresScheduler           `json:"scheduler,omitempty"`
 	Resources                v1.ResourceRequirements     `json:"resources,omitempty"`
