@@ -21,6 +21,8 @@ See [`docs/primary-drain-failover.md`](docs/primary-drain-failover.md) for the o
 
 * It manages fail-over: if a Primary PostgreSql crashes, it automatically promotes a Replica PostgreSql as a Primary.
 
+* It supports database PVC expansion. Increase `spec.database.size` when the database volume needs more space; the operator updates each PVC in replica-first order and leaves running Pods untouched when the CSI provider supports online filesystem resize. The StorageClass must set `allowVolumeExpansion: true`; shrinking is rejected.
+
 * It has a data backup option allowing to dump PostgreSql data regularly in a given volume.
 
 * It provides a very simple YAML with properties specialised for PostgreSql.

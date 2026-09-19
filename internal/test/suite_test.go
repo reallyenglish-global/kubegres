@@ -38,6 +38,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -109,6 +110,16 @@ var _ = BeforeSuite(func() {
 	k8sClientsetTest, err = kubernetes.NewForConfig(cfg)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClientsetTest).ToNot(BeNil())
+
+	// Kind's local-path StorageClass leaves AllowVolumeExpansion unset. The
+	// database-size feature is exercised against the default test class, so
+	// explicitly enable the capability that a production CSI class must provide.
+	standardStorageClass, err := k8sClientsetTest.StorageV1().StorageClasses().Get(context.Background(), "standard", metav1.GetOptions{})
+	Expect(err).ToNot(HaveOccurred())
+	allowVolumeExpansion := true
+	standardStorageClass.AllowVolumeExpansion = &allowVolumeExpansion
+	_, err = k8sClientsetTest.StorageV1().StorageClasses().Update(context.Background(), standardStorageClass, metav1.UpdateOptions{})
+	Expect(err).ToNot(HaveOccurred())
 
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
