@@ -23,7 +23,10 @@ package resourceConfigs
 import "time"
 
 const (
-	TestTimeout            = time.Second * 240
+	// PostgreSQL minor-image upgrades deliberately roll a replica, fail over,
+	// and recreate the old primary. Keep the assertion timeout aligned with the
+	// controller's 10-minute upgrade operation timeout.
+	TestTimeout            = time.Second * 600
 	TestRetryInterval      = time.Second * 5
 	DefaultNamespace       = "default"
 	PrimaryReplicationRole = "primary"
