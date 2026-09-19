@@ -22,7 +22,6 @@ package statefulset_spec
 
 import (
 	"errors"
-	"fmt"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -30,7 +29,6 @@ import (
 	"reactive-tech.io/kubegres/internal/controller/states"
 	"reactive-tech.io/kubegres/internal/controller/states/statefulset"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
 )
 
 type StorageClassSizeSpecEnforcer struct {
@@ -48,20 +46,29 @@ func (r *StorageClassSizeSpecEnforcer) GetSpecName() string {
 
 func (r *StorageClassSizeSpecEnforcer) CheckForSpecDifference(statefulSet *apps.StatefulSet) StatefulSetSpecDifference {
 
-	// TODO: codes to re-enable when Kubernetes allows updating storage size in StatefulSet (see https://github.com/kubernetes/enhancements/pull/2842)
-	/*
-		current := statefulSet.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[core.ResourceStorage]
-		expected := resource.MustParse(r.kubegresContext.Kubegres.Spec.Database.Size)
+	persistentVolumeClaimName, err := r.getPersistentVolumeClaimName(statefulSet)
+	if err != nil {
+		return StatefulSetSpecDifference{}
+	}
+	persistentVolumeClaim, err := r.getPersistentVolumeClaim(persistentVolumeClaimName)
+	if err != nil {
+		return StatefulSetSpecDifference{}
+	}
 
-		if current != expected {
-			return StatefulSetSpecDifference{
-				SpecName: r.GetSpecName(),
-				Current:  current.String(),
-				Expected: expected.String(),
-			}
-		}*/
+	expected := resource.MustParse(r.kubegresContext.Kubegres.Spec.Database.Size)
+	current := persistentVolumeClaim.Spec.Resources.Requests[core.ResourceStorage]
+	// Status.Capacity is the important value: the request can be updated before
+	// the CSI controller has actually expanded the volume. If a provider does
+	// not publish capacity yet (common with newly-created PVCs), the request is
+	// the best available observation.
+	if statusCapacity, ok := persistentVolumeClaim.Status.Capacity[core.ResourceStorage]; ok && statusCapacity.Cmp(current) > 0 {
+		current = statusCapacity
+	}
+	if current.Cmp(expected) >= 0 {
+		return StatefulSetSpecDifference{}
+	}
 
-	return StatefulSetSpecDifference{}
+	return StatefulSetSpecDifference{SpecName: r.GetSpecName(), Current: current.String(), Expected: expected.String()}
 }
 
 func (r *StorageClassSizeSpecEnforcer) EnforceSpec(statefulSet *apps.StatefulSet) (wasSpecUpdated bool, err error) {
@@ -86,7 +93,14 @@ func (r *StorageClassSizeSpecEnforcer) EnforceSpec(statefulSet *apps.StatefulSet
 
 	newSize := r.kubegresContext.Kubegres.Spec.Database.Size
 	r.kubegresContext.Log.Info("Updating Persistence Volume Claim to new size", "PVC name", persistentVolumeClaimName, "New size", newSize)
-	persistentVolumeClaim.Spec.Resources.Requests = core.ResourceList{core.ResourceStorage: resource.MustParse(newSize)}
+	desiredSize := resource.MustParse(newSize)
+	requestedSize := persistentVolumeClaim.Spec.Resources.Requests[core.ResourceStorage]
+	if requestedSize.Cmp(desiredSize) >= 0 {
+		// The request is already with the provider. Leave it alone while the
+		// asynchronous resize updates PVC status.capacity.
+		return false, nil
+	}
+	persistentVolumeClaim.Spec.Resources.Requests[core.ResourceStorage] = desiredSize
 
 	err = r.kubegresContext.Client.Update(r.kubegresContext.Ctx, persistentVolumeClaim)
 	if err != nil {
@@ -95,8 +109,6 @@ func (r *StorageClassSizeSpecEnforcer) EnforceSpec(statefulSet *apps.StatefulSet
 	}
 
 	r.kubegresContext.Log.Info("Updated Persistence Volume Claim Spec to new size", "PVC name", persistentVolumeClaimName, "New size", newSize)
-
-	r.updateStatefulSetToForceToRestart(statefulSet)
 
 	return true, nil
 }
@@ -142,15 +154,4 @@ func (r *StorageClassSizeSpecEnforcer) getStatefulSetWrapper(statefulSet *apps.S
 	}
 
 	return statefulset.StatefulSetWrapper{}, errors.New("Cannot find statefulSet inside ResourcesStates. StatefulSet name: " + statefulSet.Name)
-}
-
-func (r *StorageClassSizeSpecEnforcer) updateStatefulSetToForceToRestart(statefulSet *apps.StatefulSet) {
-	index := 0
-	sizeChangedCounter := statefulSet.Spec.Template.ObjectMeta.Labels["sizeChangedCounter"]
-
-	if sizeChangedCounter != "" {
-		index, _ = strconv.Atoi(sizeChangedCounter)
-	}
-
-	statefulSet.Spec.Template.ObjectMeta.Labels["sizeChangedCounter"] = fmt.Sprint(index + 1)
 }

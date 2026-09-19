@@ -25,6 +25,7 @@ import (
 	"fmt"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation"
 	postgresV1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
@@ -90,7 +91,18 @@ func (r *SpecChecker) CheckSpec() (SpecCheckResult, error) {
 
 		primaryStorageSizeQuantity := primaryStatefulSetSpec.VolumeClaimTemplates[0].Spec.Resources.Requests[v1.ResourceStorage]
 		primaryStorageSize := primaryStorageSizeQuantity.String()
-		if spec.Database.Size != primaryStorageSize && !r.doesStorageClassAllowVolumeExpansion() {
+		desiredStorageSize, parseErr := resource.ParseQuantity(spec.Database.Size)
+		if parseErr != nil {
+			specCheckResult.HasSpecFatalError = true
+			specCheckResult.FatalErrorMessage = r.logSpecErrMsg("The value of 'spec.database.size' is not a valid Kubernetes storage quantity: " + parseErr.Error())
+		} else if spec.Database.Size != primaryStorageSize && desiredStorageSize.Cmp(primaryStorageSizeQuantity) < 0 {
+			specCheckResult.HasSpecFatalError = true
+			specCheckResult.FatalErrorMessage = r.createErrMsgSpecCannotBeChanged("spec.database.size",
+				primaryStorageSize, spec.Database.Size,
+				"Persistent volumes can only be expanded, never shrunk.")
+			spec.Database.Size = primaryStorageSize
+			r.updateKubegresSpec("spec.database.size", primaryStorageSize)
+		} else if spec.Database.Size != primaryStorageSize && !r.doesStorageClassAllowVolumeExpansion() {
 
 			specCheckResult.HasSpecFatalError = true
 			specCheckResult.FatalErrorMessage = r.createErrMsgSpecCannotBeChanged("spec.database.size",
@@ -102,16 +114,8 @@ func (r *SpecChecker) CheckSpec() (SpecCheckResult, error) {
 			r.updateKubegresSpec("spec.database.size", primaryStorageSize)
 
 			// TODO: condition to remove when Kubernetes allows updating storage size in StatefulSet (see https://github.com/kubernetes/enhancements/pull/2842)
-		} else if spec.Database.Size != primaryStorageSize {
-			specCheckResult.HasSpecFatalError = true
-			specCheckResult.FatalErrorMessage = r.createErrMsgSpecCannotBeChanged("spec.database.size",
-				primaryStorageSize,
-				spec.Database.Size,
-				"The database size cannot be modified after the creation of the Postgres cluster. "+
-					"We are rolling back that value to its previous value.")
-
-			spec.Database.Size = primaryStorageSize
-			r.updateKubegresSpec("spec.database.size", primaryStorageSize)
+			// PVC expansion is handled by StorageClassSizeSpecEnforcer. Do not
+			// mutate the StatefulSet's immutable volumeClaimTemplate here.
 		}
 
 		if r.hasCustomVolumeClaimTemplatesChanged(primaryStatefulSetSpec) {

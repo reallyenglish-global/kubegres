@@ -92,7 +92,7 @@ var _ = Describe("Setting Kubegres specs 'database.size'", Label("database-specs
 			log.Print("END OF: Test 'GIVEN new Kubegres is created with spec 'database.size' set to '300Mi' and spec 'replica' set to 3'")
 		})
 
-		It("GIVEN existing Kubegres is updated with spec 'database.size' set from '300Mi' to '400Mi' THEN an error event should be logged", func() {
+		It("GIVEN existing Kubegres is updated with spec 'database.size' set from '300Mi' to '400Mi' THEN every PVC should be expanded", func() {
 
 			log.Print("START OF: Test 'GIVEN existing Kubegres is updated with spec 'database.size' set from '300Mi' to '400Mi'")
 
@@ -100,11 +100,9 @@ var _ = Describe("Setting Kubegres specs 'database.size'", Label("database-specs
 
 			test.whenKubernetesIsUpdated()
 
-			test.thenErrorEventShouldBeLoggedSayingCannotChangeStorageSize("300Mi", "400Mi")
+			test.thenPodsStatesShouldBe("400Mi", 1, 2)
 
-			test.thenPodsStatesShouldBe("300Mi", 1, 2)
-
-			test.thenDeployedKubegresSpecShouldBeSetTo("300Mi")
+			test.thenDeployedKubegresSpecShouldBeSetTo("400Mi")
 
 			test.dbQueryTestCases.ThenWeCanSqlQueryPrimaryDb()
 			test.dbQueryTestCases.ThenWeCanSqlQueryReplicaDb()
