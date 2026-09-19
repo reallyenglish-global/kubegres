@@ -23,16 +23,17 @@ package resourceConfigs
 import "time"
 
 const (
-	TestTimeout            = time.Second * 240
-	TestRetryInterval      = time.Second * 5
-	DefaultNamespace       = "default"
-	PrimaryReplicationRole = "primary"
-	DbPort                 = 5432
-	DbUser                 = "postgres"
-	DbPassword             = "postgresSuperUserPsw"
-	DbName                 = "postgres"
-	TableName              = "account"
-	DbHost                 = "172.18.0.3"
+	TestTimeout                     = time.Second * 240
+	PostgresMinorUpgradeTestTimeout = time.Minute * 10
+	TestRetryInterval               = time.Second * 5
+	DefaultNamespace                = "default"
+	PrimaryReplicationRole          = "primary"
+	DbPort                          = 5432
+	DbUser                          = "postgres"
+	DbPassword                      = "postgresSuperUserPsw"
+	DbName                          = "postgres"
+	TableName                       = "account"
+	DbHost                          = "172.18.0.3"
 
 	KubegresYamlFile     = "resourceConfigs/kubegres.yaml"
 	KubegresResourceName = "my-kubegres"

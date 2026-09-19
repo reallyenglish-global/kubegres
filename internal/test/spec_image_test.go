@@ -100,7 +100,7 @@ var _ = Describe("Setting Kubegres spec 'image'", Label("database-specs", "shard
 
 			test.whenKubernetesIsUpdated()
 
-			test.thenPodsStatesShouldBe("postgres:17.2", 1, 2)
+			test.thenPodsStatesShouldBeWithTimeout("postgres:17.2", 1, 2, resourceConfigs2.PostgresMinorUpgradeTestTimeout)
 
 			test.thenDeployedKubegresSpecShouldBeSetTo("postgres:17.2")
 
@@ -166,6 +166,10 @@ func (r *SpecImageTest) thenErrorEventShouldBeLogged() {
 }
 
 func (r *SpecImageTest) thenPodsStatesShouldBe(image string, nbrePrimary, nbreReplicas int) bool {
+	return r.thenPodsStatesShouldBeWithTimeout(image, nbrePrimary, nbreReplicas, resourceConfigs2.TestTimeout)
+}
+
+func (r *SpecImageTest) thenPodsStatesShouldBeWithTimeout(image string, nbrePrimary, nbreReplicas int, timeout time.Duration) bool {
 	return Eventually(func() bool {
 
 		kubegresResources, err := r.resourceRetriever.GetKubegresResources()
@@ -194,7 +198,7 @@ func (r *SpecImageTest) thenPodsStatesShouldBe(image string, nbrePrimary, nbreRe
 
 		return false
 
-	}, resourceConfigs2.TestTimeout, resourceConfigs2.TestRetryInterval).Should(BeTrue())
+	}, timeout, resourceConfigs2.TestRetryInterval).Should(BeTrue())
 }
 
 func (r *SpecImageTest) thenDeployedKubegresSpecShouldBeSetTo(image string) {
