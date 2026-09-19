@@ -38,6 +38,11 @@ const (
 	OperationStepIdReplicaDbDeploying        = "Replica DB is deploying"
 	OperationStepIdReplicaDbUndeploying      = "Replica DB is undeploying"
 
+	OperationIdPostgresMinorVersionUpgrade              = "PostgreSQL minor version upgrade"
+	OperationStepIdPostgresUpgradeReplica               = "PostgreSQL upgrade: replica is updating"
+	OperationStepIdPostgresUpgradeWaitingBeforeFailover = "PostgreSQL upgrade: waiting before failover"
+	OperationStepIdPostgresUpgradeFailingOver           = "PostgreSQL upgrade: failing over to upgraded replica"
+
 	OperationIdStatefulSetSpecEnforcing         = "Enforcing StatefulSet's Spec"
 	OperationStepIdStatefulSetSpecUpdating      = "StatefulSet's spec is updating"
 	OperationStepIdStatefulSetPodSpecUpdating   = "StatefulSet Pod's spec is updating"

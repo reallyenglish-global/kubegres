@@ -89,6 +89,11 @@ func (r *AllStatefulSetsSpecEnforcer) CreateOperationConfigForStatefulSetWaiting
 
 func (r *AllStatefulSetsSpecEnforcer) EnforceSpec() error {
 
+	upgradeHandled, err := r.enforcePostgresMinorUpgrade()
+	if upgradeHandled {
+		return err
+	}
+
 	if !r.isPrimaryDbReady() {
 		return nil
 	}

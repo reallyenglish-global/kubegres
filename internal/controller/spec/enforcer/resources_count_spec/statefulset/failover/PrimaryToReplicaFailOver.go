@@ -96,26 +96,42 @@ func (r *PrimaryToReplicaFailOver) ShouldWeFailOver() bool {
 }
 
 func (r *PrimaryToReplicaFailOver) FailOver() error {
+	return r.failOverWithOperation(
+		operation2.OperationIdPrimaryDbCountSpecEnforcement,
+		operation2.OperationStepIdPrimaryDbWaitingBeforeFailingOver,
+		operation2.OperationStepIdPrimaryDbFailingOver,
+	)
+}
 
-	if r.blockingOperation.IsActiveOperationIdDifferentOf(operation2.OperationIdPrimaryDbCountSpecEnforcement) {
+// FailOverForPostgresMinorUpgrade promotes the already-upgraded replica without
+// changing the number of requested replicas. The old primary is removed first;
+// the normal replica-count enforcer then recreates it as a replica from the new
+// primary, which avoids ever running mixed major PostgreSQL versions.
+func (r *PrimaryToReplicaFailOver) FailOverForPostgresMinorUpgrade() error {
+	return r.failOverWithOperation(
+		operation2.OperationIdPostgresMinorVersionUpgrade,
+		operation2.OperationStepIdPostgresUpgradeWaitingBeforeFailover,
+		operation2.OperationStepIdPostgresUpgradeFailingOver,
+	)
+}
+
+func (r *PrimaryToReplicaFailOver) failOverWithOperation(operationID, waitingStepID, failingOverStepID string) error {
+	if r.blockingOperation.IsActiveOperationIdDifferentOf(operationID) {
 		return nil
 	}
-
-	if r.hasLastFailOverAttemptTimedOut() {
+	if r.blockingOperation.HasActiveOperationIdTimedOut(operationID) {
 		r.logFailoverTimedOut()
 		return nil
 	}
 
-	var newPrimary, err = r.selectReplicaToPromote()
+	newPrimary, err := r.selectReplicaToPromote()
 	if err != nil {
 		return err
 	}
-
-	if !r.isWaitingBeforeStartingFailOver() {
-		return r.waitBeforePromotingReplicaToPrimary(newPrimary)
-	} else {
-		return r.promoteReplicaToPrimary(newPrimary)
+	if !r.isWaitingBeforeStartingFailOverFor(operationID, waitingStepID) {
+		return r.waitBeforePromotingReplicaToPrimaryFor(newPrimary, operationID, waitingStepID)
 	}
+	return r.promoteReplicaToPrimaryFor(newPrimary, operationID, failingOverStepID)
 }
 
 func (r *PrimaryToReplicaFailOver) isFailOverCompleted(operation v1.KubegresBlockingOperation) bool {
@@ -221,12 +237,18 @@ func (r *PrimaryToReplicaFailOver) isManualFailoverRequested() bool {
 }
 
 func (r *PrimaryToReplicaFailOver) isWaitingBeforeStartingFailOver() bool {
-	if !r.blockingOperation.IsActiveOperationInTransition(operation2.OperationIdPrimaryDbCountSpecEnforcement) {
+	return r.isWaitingBeforeStartingFailOverFor(
+		operation2.OperationIdPrimaryDbCountSpecEnforcement,
+		operation2.OperationStepIdPrimaryDbWaitingBeforeFailingOver)
+}
+
+func (r *PrimaryToReplicaFailOver) isWaitingBeforeStartingFailOverFor(operationID, stepID string) bool {
+	if !r.blockingOperation.IsActiveOperationInTransition(operationID) {
 		return false
 	}
 
 	previouslyActiveOperation := r.blockingOperation.GetPreviouslyActiveOperation()
-	return previouslyActiveOperation.StepId == operation2.OperationStepIdPrimaryDbWaitingBeforeFailingOver
+	return previouslyActiveOperation.StepId == stepID
 }
 
 func (r *PrimaryToReplicaFailOver) getStatefulSetByInstanceIndex(newPrimaryInstanceIndex int32) (statefulset.StatefulSetWrapper, error) {
@@ -265,6 +287,12 @@ func (r *PrimaryToReplicaFailOver) manuallySelectReplicaToPromote() (statefulset
 }
 
 func (r *PrimaryToReplicaFailOver) promoteReplicaToPrimary(newPrimary statefulset.StatefulSetWrapper) error {
+	return r.promoteReplicaToPrimaryFor(newPrimary,
+		operation2.OperationIdPrimaryDbCountSpecEnforcement,
+		operation2.OperationStepIdPrimaryDbFailingOver)
+}
+
+func (r *PrimaryToReplicaFailOver) promoteReplicaToPrimaryFor(newPrimary statefulset.StatefulSetWrapper, operationID, stepID string) error {
 
 	newPrimary.StatefulSet.Labels["replicationRole"] = ctx.PrimaryRoleName
 	newPrimary.StatefulSet.Spec.Template.Labels["replicationRole"] = ctx.PrimaryRoleName
@@ -285,7 +313,7 @@ func (r *PrimaryToReplicaFailOver) promoteReplicaToPrimary(newPrimary statefulse
 		},
 	}
 
-	err := r.activateOperationFailingOver(newPrimary)
+	err := r.activateOperationFailingOverFor(newPrimary, operationID, stepID)
 	if err != nil {
 		r.kubegresContext.Log.ErrorEvent("FailOverOperationActivationErr", err,
 			"Error while activating a blocking operation for the FailOver of a Primary DB.",
@@ -309,6 +337,12 @@ func (r *PrimaryToReplicaFailOver) promoteReplicaToPrimary(newPrimary statefulse
 }
 
 func (r *PrimaryToReplicaFailOver) waitBeforePromotingReplicaToPrimary(newPrimary statefulset.StatefulSetWrapper) error {
+	return r.waitBeforePromotingReplicaToPrimaryFor(newPrimary,
+		operation2.OperationIdPrimaryDbCountSpecEnforcement,
+		operation2.OperationStepIdPrimaryDbWaitingBeforeFailingOver)
+}
+
+func (r *PrimaryToReplicaFailOver) waitBeforePromotingReplicaToPrimaryFor(newPrimary statefulset.StatefulSetWrapper, operationID, stepID string) error {
 
 	err := r.deletePrimaryStatefulSet()
 	if err != nil {
@@ -318,7 +352,7 @@ func (r *PrimaryToReplicaFailOver) waitBeforePromotingReplicaToPrimary(newPrimar
 		return err
 	}
 
-	err = r.activateOperationWaitingBeforeFailingOver(newPrimary)
+	err = r.activateOperationWaitingBeforeFailingOverFor(newPrimary, operationID, stepID)
 	if err != nil {
 		r.kubegresContext.Log.ErrorEvent("FailOverOperationActivationErr", err,
 			"Error while activating a blocking operation to wait before starting the FailOver of a Primary DB.",
@@ -332,14 +366,26 @@ func (r *PrimaryToReplicaFailOver) waitBeforePromotingReplicaToPrimary(newPrimar
 }
 
 func (r *PrimaryToReplicaFailOver) activateOperationWaitingBeforeFailingOver(newPrimary statefulset.StatefulSetWrapper) error {
-	return r.blockingOperation.ActivateOperationOnStatefulSet(operation2.OperationIdPrimaryDbCountSpecEnforcement,
-		operation2.OperationStepIdPrimaryDbWaitingBeforeFailingOver,
+	return r.activateOperationWaitingBeforeFailingOverFor(newPrimary,
+		operation2.OperationIdPrimaryDbCountSpecEnforcement,
+		operation2.OperationStepIdPrimaryDbWaitingBeforeFailingOver)
+}
+
+func (r *PrimaryToReplicaFailOver) activateOperationWaitingBeforeFailingOverFor(newPrimary statefulset.StatefulSetWrapper, operationID, stepID string) error {
+	return r.blockingOperation.ActivateOperationOnStatefulSet(operationID,
+		stepID,
 		newPrimary.InstanceIndex)
 }
 
 func (r *PrimaryToReplicaFailOver) activateOperationFailingOver(newPrimary statefulset.StatefulSetWrapper) error {
-	return r.blockingOperation.ActivateOperationOnStatefulSet(operation2.OperationIdPrimaryDbCountSpecEnforcement,
-		operation2.OperationStepIdPrimaryDbFailingOver,
+	return r.activateOperationFailingOverFor(newPrimary,
+		operation2.OperationIdPrimaryDbCountSpecEnforcement,
+		operation2.OperationStepIdPrimaryDbFailingOver)
+}
+
+func (r *PrimaryToReplicaFailOver) activateOperationFailingOverFor(newPrimary statefulset.StatefulSetWrapper, operationID, stepID string) error {
+	return r.blockingOperation.ActivateOperationOnStatefulSet(operationID,
+		stepID,
 		newPrimary.InstanceIndex)
 }
 
