@@ -24,6 +24,7 @@ import "time"
 
 const (
 	TestTimeout                     = time.Second * 240
+	// A coordinated upgrade rolls each replica through failover; it can outlive the default assertion timeout.
 	PostgresMinorUpgradeTestTimeout = time.Minute * 10
 	TestRetryInterval               = time.Second * 5
 	DefaultNamespace                = "default"
