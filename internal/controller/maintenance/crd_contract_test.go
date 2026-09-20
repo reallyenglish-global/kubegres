@@ -82,3 +82,49 @@ func dig(t *testing.T, node any, keys ...string) any {
 	}
 	return node
 }
+
+func TestMaintenanceOperationSampleIsPublished(t *testing.T) {
+	const sample = "kubegres_v1_maintenanceoperation.yaml"
+	kustomization, err := os.ReadFile(configPath(t, "samples", "kustomization.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(kustomization), sample) {
+		t.Fatalf("config/samples/kustomization.yaml does not list %s", sample)
+	}
+	raw, err := os.ReadFile(configPath(t, "samples", sample))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var obj map[string]any
+	if err := yaml.Unmarshal(raw, &obj); err != nil {
+		t.Fatal(err)
+	}
+	if obj["kind"] != "MaintenanceOperation" {
+		t.Fatalf("sample kind = %v", obj["kind"])
+	}
+	spec := obj["spec"].(map[string]any)
+	if dig(t, spec, "targetNode", "uid") == nil || spec["expiresAt"] == nil || spec["purpose"] == nil || dig(t, spec, "kubegresRef", "name") == nil {
+		t.Fatalf("sample is missing required spec fields: %v", spec)
+	}
+}
+
+func TestMaintenanceOperationAdminRolesAreInstalled(t *testing.T) {
+	kustomization, err := os.ReadFile(configPath(t, "rbac", "kustomization.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, role := range []string{"maintenanceoperation_editor_role.yaml", "maintenanceoperation_viewer_role.yaml"} {
+		if !strings.Contains(string(kustomization), role) {
+			t.Errorf("config/rbac/kustomization.yaml does not list %s", role)
+		}
+		raw, err := os.ReadFile(configPath(t, "rbac", role))
+		if err != nil {
+			t.Errorf("%s: %v", role, err)
+			continue
+		}
+		if !strings.Contains(string(raw), "- maintenanceoperations\n") {
+			t.Errorf("%s does not grant access to maintenanceoperations", role)
+		}
+	}
+}

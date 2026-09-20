@@ -93,3 +93,19 @@ func TestClassifyPodLossRecordsEvidence(t *testing.T) {
 		}
 	}
 }
+
+func TestClassifyPodLossIgnoresExpiredOperation(t *testing.T) {
+	now := time.Date(2026, 9, 18, 12, 0, 0, 0, time.UTC)
+	op := &kubegresv1.MaintenanceOperation{Spec: kubegresv1.MaintenanceOperationSpec{Purpose: kubegresv1.NodeUpgrade, TargetNode: kubegresv1.MaintenanceNodeReference{UID: "node-uid"}, ExpiresAt: metav1.NewTime(now)}}
+	got := ClassifyPodLoss(Input{Now: now, Operation: op, PodNodeUID: "node-uid", DisruptionReason: ReasonEvictionByEvictionAPI})
+	if got.Class != PlannedVoluntaryUnknown {
+		t.Fatalf("expired operation still matched: class=%q source=%q", got.Class, got.Source)
+	}
+}
+
+func TestMaintenanceOperationClosedIsInactive(t *testing.T) {
+	op := kubegresv1.MaintenanceOperation{Status: kubegresv1.MaintenanceOperationStatus{Phase: kubegresv1.MaintenancePhaseClosed}}
+	if IsActive(&op) {
+		t.Fatal("Closed operation reported active")
+	}
+}

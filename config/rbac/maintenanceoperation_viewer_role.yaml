@@ -1,0 +1,23 @@
+# permissions for end users to view maintenanceoperations.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: kubegres
+    app.kubernetes.io/managed-by: kustomize
+  name: maintenanceoperation-viewer-role
+rules:
+- apiGroups:
+  - kubegres.reactive-tech.io
+  resources:
+  - maintenanceoperations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kubegres.reactive-tech.io
+  resources:
+  - maintenanceoperations/status
+  verbs:
+  - get

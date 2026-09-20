@@ -99,7 +99,7 @@ The prior feature was committed as `6e103bb Support failover before voluntary pr
 ### Phase C — maintenance blocking state machine
 
 - Use the existing blocking-operation architecture rather than a parallel untracked loop.
-- Add phases: `Pending`, `RelocatingReplica`, `AwaitingPrimaryDrain`, `Fencing`, `Promoting`, `Rejoining`, `Completed`, `Aborted`, `ManualIntervention`.
+- Add phases: `Pending`, `RelocatingReplica`, `AwaitingPrimaryDrain`, `Fencing`, `Promoting`, `Rejoining`, `Completed`, `Aborted`, `Closed`, `ManualIntervention`.
 - Ensure replica relocation preserves desired cardinality: recreate/relocate the selected replica, but never create an extra replica StatefulSet.
 - Block normal replica-count enforcement while the operation owns topology.
 - Enforce the 5-second/60-second/15-minute gates as configurable defaults, with validation and explicit timeout outcomes.

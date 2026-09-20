@@ -1,0 +1,23 @@
+# A planned node operation approved for a single Kubegres cluster.
+# The controller-side workflow for this kind is not wired yet; creating
+# one today records intent only and has no runtime effect.
+apiVersion: kubegres.reactive-tech.io/v1
+kind: MaintenanceOperation
+metadata:
+  name: my-kubegres-node-upgrade
+  namespace: default
+spec:
+  kubegresRef:
+    name: my-kubegres
+  purpose: node-upgrade
+  targetNode:
+    name: gke-pool-1-node-abc123
+    # The Node UID is the authoritative, immutable target identity.
+    uid: 0f1c2a1e-6c62-4c6d-9d3a-6c0b4a2c9a11
+  expiresAt: "2026-09-21T02:00:00Z"
+  safety:
+    maxReplayLagSeconds: 5
+    stableForSeconds: 60
+    relocationDeadlineSeconds: 900
+  requesterIdentity: platform-upgrade-workflow
+  approvalReference: CHG-000123

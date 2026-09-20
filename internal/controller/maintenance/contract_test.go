@@ -21,6 +21,9 @@ func TestValidateOperation(t *testing.T) {
 		"missing target UID": func(v *kubegresv1.MaintenanceOperation) { v.Spec.TargetNode.UID = "" },
 		"missing Kubegres":   func(v *kubegresv1.MaintenanceOperation) { v.Spec.KubegresRef.Name = "" },
 		"expired":            func(v *kubegresv1.MaintenanceOperation) { v.Spec.ExpiresAt = metav1.NewTime(now) },
+		"missing expiry":     func(v *kubegresv1.MaintenanceOperation) { v.Spec.ExpiresAt = metav1.Time{} },
+		"missing purpose":    func(v *kubegresv1.MaintenanceOperation) { v.Spec.Purpose = "" },
+		"unknown purpose":    func(v *kubegresv1.MaintenanceOperation) { v.Spec.Purpose = "reboot" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			v := valid.DeepCopy()

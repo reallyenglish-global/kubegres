@@ -219,7 +219,7 @@ spec:
     stableForSeconds: 60
     relocationDeadlineSeconds: 900
 status:
-  phase: Pending # Pending | RelocatingReplica | AwaitingPrimaryDrain | Fencing | Promoting | Rejoining | Completed | Aborted | ManualIntervention
+  phase: Pending # Pending | RelocatingReplica | AwaitingPrimaryDrain | Fencing | Promoting | Rejoining | Completed | Aborted | Closed | ManualIntervention
   operationID: "uuid"
   classification: node_upgrade
   conditions: []

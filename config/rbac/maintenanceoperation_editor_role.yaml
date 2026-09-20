@@ -1,0 +1,27 @@
+# permissions for end users to edit maintenanceoperations.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: kubegres
+    app.kubernetes.io/managed-by: kustomize
+  name: maintenanceoperation-editor-role
+rules:
+- apiGroups:
+  - kubegres.reactive-tech.io
+  resources:
+  - maintenanceoperations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kubegres.reactive-tech.io
+  resources:
+  - maintenanceoperations/status
+  verbs:
+  - get
