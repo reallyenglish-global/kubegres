@@ -153,13 +153,13 @@ LATEST ?= controller:latest
 .PHONY: deploy-check
 deploy-check:
 ifeq ($(IMG),$(LATEST))
-	@echo "PLEASE PROVIDE THE ARGUMENT 'IMG' WHEN RUNNING 'make deploy'. EXAMPLE OF USAGE: 'make deploy IMG=reactivetechio/kubegres:1.19'"
+	@echo "PLEASE PROVIDE THE ARGUMENT 'IMG' WHEN RUNNING 'make deploy'. EXAMPLE OF USAGE: 'make deploy IMG=ghcr.io/reallyenglish-global/kubegres:v1.19'"
 	exit 1
 endif
 	@echo "RUNNING THE ACCEPTANCE TESTS AND THEN WILL DEPLOY $(IMG) INTO DOCKER HUB."
 
-## Usage: 'make deploy IMG=reactivetechio/kubegres:[version]'
-## eg: 'make deploy IMG=reactivetechio/kubegres:1.19'
+## Usage: 'make deploy IMG=ghcr.io/reallyenglish-global/kubegres:v<version>'
+## eg: 'make deploy IMG=ghcr.io/reallyenglish-global/kubegres:v1.19'
 ## Run acceptance tests then deploy into Docker Hub the controller as the Docker image provided in arg ${IMG}
 ## and update the local file "kubegres.yaml" with the image ${IMG}
 .PHONY: deploy
