@@ -23,5 +23,7 @@ resources:
 # not used by the Project itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
 - kubegres_editor_role.yaml
+- maintenanceoperation_editor_role.yaml
+- maintenanceoperation_viewer_role.yaml
 - kubegres_viewer_role.yaml
 

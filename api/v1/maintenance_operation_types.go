@@ -1,0 +1,112 @@
+package v1
+
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+// MaintenancePurpose identifies the approved reason for a planned node operation.
+type MaintenancePurpose string
+
+const (
+	NodeUpgrade     MaintenancePurpose = "node-upgrade"
+	NodeMaintenance MaintenancePurpose = "node-maintenance"
+	NodeRotation    MaintenancePurpose = "node-rotation"
+)
+
+type MaintenancePhase string
+
+const (
+	MaintenancePhasePending              MaintenancePhase = "Pending"
+	MaintenancePhaseRelocatingReplica    MaintenancePhase = "RelocatingReplica"
+	MaintenancePhaseAwaitingPrimaryDrain MaintenancePhase = "AwaitingPrimaryDrain"
+	MaintenancePhaseFencing              MaintenancePhase = "Fencing"
+	MaintenancePhasePromoting            MaintenancePhase = "Promoting"
+	MaintenancePhaseRejoining            MaintenancePhase = "Rejoining"
+	MaintenancePhaseCompleted            MaintenancePhase = "Completed"
+	MaintenancePhaseAborted              MaintenancePhase = "Aborted"
+	MaintenancePhaseClosed               MaintenancePhase = "Closed"
+	MaintenancePhaseManualIntervention   MaintenancePhase = "ManualIntervention"
+)
+
+type MaintenanceNodeReference struct {
+	Name string `json:"name,omitempty"`
+	// UID is immutable and is the authoritative target identity.
+	//+kubebuilder:validation:MinLength=1
+	//+kubebuilder:validation:XValidation:rule="self == oldSelf",message="targetNode.uid is immutable"
+	UID string `json:"uid"`
+}
+
+type MaintenanceKubegresReference struct {
+	Name string `json:"name"`
+}
+
+// MaintenanceSafetyPolicy holds the promotion gate thresholds. Defaults are the
+// approved 5-second / 60-second / 15-minute values.
+type MaintenanceSafetyPolicy struct {
+	//+kubebuilder:default=5
+	//+kubebuilder:validation:Minimum=0
+	MaxReplayLagSeconds int32 `json:"maxReplayLagSeconds,omitempty"`
+	//+kubebuilder:default=60
+	//+kubebuilder:validation:Minimum=0
+	StableForSeconds int32 `json:"stableForSeconds,omitempty"`
+	//+kubebuilder:default=900
+	//+kubebuilder:validation:Minimum=0
+	RelocationDeadlineSeconds int32 `json:"relocationDeadlineSeconds,omitempty"`
+}
+
+// MaintenanceOperationSpec declares an approved, expiring planned operation.
+type MaintenanceOperationSpec struct {
+	KubegresRef MaintenanceKubegresReference `json:"kubegresRef"`
+	//+kubebuilder:validation:Enum=node-upgrade;node-maintenance;node-rotation
+	//+kubebuilder:validation:XValidation:rule="self == oldSelf",message="purpose is immutable"
+	Purpose    MaintenancePurpose       `json:"purpose"`
+	TargetNode MaintenanceNodeReference `json:"targetNode"`
+	//+kubebuilder:validation:XValidation:rule="self == oldSelf",message="expiresAt is immutable"
+	ExpiresAt metav1.Time `json:"expiresAt"`
+	//+kubebuilder:default={}
+	Safety MaintenanceSafetyPolicy `json:"safety,omitempty"`
+	// RequesterIdentity preserves the human or workflow identity behind the
+	// approved service-account request.
+	RequesterIdentity string `json:"requesterIdentity,omitempty"`
+	ApprovalReference string `json:"approvalReference,omitempty"`
+}
+
+type MaintenanceOperationHistoryEntry struct {
+	At       metav1.Time       `json:"at"`
+	Phase    MaintenancePhase  `json:"phase"`
+	Message  string            `json:"message,omitempty"`
+	Evidence map[string]string `json:"evidence,omitempty"`
+}
+
+type MaintenanceOperationStatus struct {
+	Phase                      MaintenancePhase                   `json:"phase,omitempty"`
+	OperationID                string                             `json:"operationID,omitempty"`
+	Classification             string                             `json:"classification,omitempty"`
+	ObservedKubegresGeneration int64                              `json:"observedKubegresGeneration,omitempty"`
+	DesiredReplicas            int32                              `json:"desiredReplicas,omitempty"`
+	Conditions                 []metav1.Condition                 `json:"conditions,omitempty"`
+	History                    []MaintenanceOperationHistoryEntry `json:"history,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=maintop
+// +kubebuilder:printcolumn:name="Kubegres",type="string",JSONPath=".spec.kubegresRef.name"
+// +kubebuilder:printcolumn:name="Purpose",type="string",JSONPath=".spec.purpose"
+// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="Expires",type="date",JSONPath=".spec.expiresAt"
+type MaintenanceOperation struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              MaintenanceOperationSpec   `json:"spec,omitempty"`
+	Status            MaintenanceOperationStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+type MaintenanceOperationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []MaintenanceOperation `json:"items"`
+}
+
+func init() {
+	SchemeBuilder.Register(&MaintenanceOperation{}, &MaintenanceOperationList{})
+}

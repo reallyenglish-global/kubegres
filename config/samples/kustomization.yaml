@@ -1,4 +1,5 @@
 ## Append samples of your project ##
 resources:
 - kubegres_v1_kubegres.yaml
+- kubegres_v1_maintenanceoperation.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

@@ -24,18 +24,22 @@ import "time"
 
 const (
 	// PostgreSQL minor-image upgrades deliberately roll a replica, fail over,
-	// and recreate the old primary. Keep the assertion timeout aligned with the
-	// controller's 10-minute upgrade operation timeout.
-	TestTimeout            = time.Second * 600
-	TestRetryInterval      = time.Second * 5
-	DefaultNamespace       = "default"
-	PrimaryReplicationRole = "primary"
-	DbPort                 = 5432
-	DbUser                 = "postgres"
-	DbPassword             = "postgresSuperUserPsw"
-	DbName                 = "postgres"
-	TableName              = "account"
-	DbHost                 = "172.18.0.3"
+	// and recreate the old primary. The controller allows 600 seconds for the
+	// replica upgrade step and another 600 seconds for the failover step
+	// (PostgresMinorUpgradeConfig.go, failover/PostgresMinorUpgrade.go), so the
+	// worst case is about 20 minutes; the happy path completes well inside the
+	// 10-minute assertion window used by the image upgrade test.
+	TestTimeout                     = time.Second * 600
+	PostgresMinorUpgradeTestTimeout = time.Minute * 10
+	TestRetryInterval               = time.Second * 5
+	DefaultNamespace                = "default"
+	PrimaryReplicationRole          = "primary"
+	DbPort                          = 5432
+	DbUser                          = "postgres"
+	DbPassword                      = "postgresSuperUserPsw"
+	DbName                          = "postgres"
+	TableName                       = "account"
+	DbHost                          = "172.18.0.3"
 
 	KubegresYamlFile     = "resourceConfigs/kubegres.yaml"
 	KubegresResourceName = "my-kubegres"
