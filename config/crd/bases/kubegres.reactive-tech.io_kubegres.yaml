@@ -49,6 +49,12 @@ spec:
                     type: string
                   schedule:
                     type: string
+                  size:
+                    description: |-
+                      Size requests a generic ephemeral PVC for the backup Pod when PvcName is
+                      empty or names a PVC that does not exist. The ephemeral PVC is deleted
+                      with the Pod, so backup scripts must copy data to durable storage.
+                    type: string
                   volumeMount:
                     type: string
                 type: object

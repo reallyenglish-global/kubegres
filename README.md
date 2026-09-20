@@ -6,6 +6,11 @@ stateful-set's life-cycle and data replication could be with Kubernetes.
 
 See [`docs/cron-tasks.md`](docs/cron-tasks.md) for independent `spec.cronTasks` CronJobs used for scheduled database maintenance. The feature is separate from, and does not change, `spec.backup`.
 
+## Backup storage
+
+See [`docs/backup-storage.md`](docs/backup-storage.md) for using an existing
+backup PVC or temporary generic ephemeral storage for backup Pods.
+
 ## Voluntary node-drain failover
 
 See [`docs/primary-drain-failover.md`](docs/primary-drain-failover.md) for the opt-in `spec.failover.onPrimaryPodDrain` feature.
