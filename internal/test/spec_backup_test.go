@@ -129,7 +129,7 @@ var _ = Describe("Setting Kubegres specs 'backup.*'", Label("storage-config", "s
 
 			test.whenKubegresIsCreated()
 
-			test.thenErrorEventShouldBeLogged("spec.Backup.PvcName")
+			test.thenBackupStorageErrorEventShouldBeLogged()
 
 			log.Print("END OF: Test 'GIVEN new Kubegres is created with spec 'backup.schedule' AND 'backup.volumeMount' BUT WITHOUT spec 'backup.pvcName''")
 		})
@@ -355,6 +355,22 @@ func (r *SpecBackUpTest) thenErrorEventShouldBeLogged(specName string) {
 		Eventtype: v12.EventTypeWarning,
 		Reason:    "SpecCheckErr",
 		Message:   "In the Resources Spec the value of '" + specName + "' is undefined. Please set a value otherwise this operator cannot work correctly.",
+	}
+	Eventually(func() bool {
+		_, err := r.resourceRetriever.GetKubegres()
+		if err != nil {
+			return false
+		}
+		return eventRecorderTest.CheckEventExist(expectedErrorEvent)
+
+	}, resourceConfigs2.TestTimeout, resourceConfigs2.TestRetryInterval).Should(BeTrue())
+}
+
+func (r *SpecBackUpTest) thenBackupStorageErrorEventShouldBeLogged() {
+	expectedErrorEvent := util2.EventRecord{
+		Eventtype: v12.EventTypeWarning,
+		Reason:    "SpecCheckErr",
+		Message:   "In the Resources Spec a backup schedule is set but neither 'spec.Backup.PvcName' nor 'spec.Backup.Size' is defined. Set 'spec.Backup.PvcName' to use an existing PersistentVolumeClaim or 'spec.Backup.Size' to use temporary storage.",
 	}
 	Eventually(func() bool {
 		_, err := r.resourceRetriever.GetKubegres()
