@@ -54,6 +54,7 @@ spec:
                       Size requests a generic ephemeral PVC for the backup Pod when PvcName is
                       empty or names a PVC that does not exist. The ephemeral PVC is deleted
                       with the Pod, so backup scripts must copy data to durable storage.
+                    pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
                     type: string
                   volumeMount:
                     type: string
@@ -257,16 +258,24 @@ spec:
                     intentionally separate from Backup so existing backup behaviour is unchanged.
                   properties:
                     args:
+                      description: Args are passed to the entrypoint.
                       items:
                         type: string
                       type: array
                     command:
+                      description: Command overrides the image entrypoint.
                       items:
                         type: string
                       type: array
                     concurrencyPolicy:
+                      description: ConcurrencyPolicy is the CronJob concurrency policy.
+                      enum:
+                      - Allow
+                      - Forbid
+                      - Replace
                       type: string
                     env:
+                      description: Env is added to the task container.
                       items:
                         description: EnvVar represents an environment variable present
                           in a Container.
@@ -424,29 +433,58 @@ spec:
                         type: object
                       type: array
                     failedJobsHistoryLimit:
+                      description: FailedJobsHistoryLimit is passed through to the
+                        CronJob.
                       format: int32
+                      minimum: 0
                       type: integer
                     image:
+                      description: Image is the container image the task runs.
+                      minLength: 1
                       type: string
                     name:
+                      description: |-
+                        Name identifies the task and forms the CronJob name. It must be a
+                        DNS-1123 label and unique within cronTasks.
+                      maxLength: 63
+                      minLength: 1
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                       type: string
                     schedule:
+                      description: Schedule is the cron expression passed to the CronJob.
+                      minLength: 1
                       type: string
                     script:
-                      description: KubegresCronTaskScript mounts one ConfigMap key
-                        as a file in a CronTask container.
+                      description: Script mounts one ConfigMap key as a file in the
+                        task container.
                       properties:
                         configMapName:
+                          description: ConfigMapName is the ConfigMap holding the
+                            script.
+                          minLength: 1
                           type: string
                         key:
+                          description: Key is the ConfigMap key whose content is mounted.
+                          minLength: 1
                           type: string
                         mountPath:
+                          description: MountPath is the file path the script is mounted
+                            at in the container.
+                          minLength: 1
                           type: string
+                      required:
+                      - configMapName
+                      - key
+                      - mountPath
                       type: object
                     successfulJobsHistoryLimit:
+                      description: SuccessfulJobsHistoryLimit is passed through to
+                        the CronJob.
                       format: int32
+                      minimum: 0
                       type: integer
                     volumeMounts:
+                      description: VolumeMounts are added to the task container.
                       items:
                         description: VolumeMount describes a mounting of a Volume
                           within a container.
@@ -510,6 +548,7 @@ spec:
                         type: object
                       type: array
                     volumes:
+                      description: Volumes are added to the task Pod.
                       items:
                         description: Volume represents a named volume in a pod that
                           may be accessed by any container in the pod.
@@ -2423,8 +2462,15 @@ spec:
                         - name
                         type: object
                       type: array
+                  required:
+                  - image
+                  - name
+                  - schedule
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               customConfig:
                 type: string
               database:
@@ -2625,11 +2671,13 @@ spec:
                   x-kubernetes-map-type: atomic
                 type: array
               lifecycle:
+                description: Lifecycle overrides container lifecycle hooks on the
+                  PostgreSQL container.
                 properties:
                   preStop:
                     description: |-
-                      LifecycleHandler defines a specific action that should be taken in a lifecycle
-                      hook. One and only one of the fields, except TCPSocket must be specified.
+                      PreStop replaces the preStop hook Kubegres sets on the PostgreSQL
+                      container.
                     properties:
                       exec:
                         description: Exec specifies a command to execute in the container.
@@ -2731,11 +2779,20 @@ spec:
                     type: object
                 type: object
               podDisruptionBudget:
+                description: |-
+                  KubegresPodDisruptionBudget controls the PodDisruptionBudget Kubegres
+                  manages for the primary. It is also created when
+                  spec.failover.onPrimaryPodDrain is true.
                 properties:
                   enabled:
+                    description: Enabled creates the PodDisruptionBudget even when
+                      drain failover is off.
                     type: boolean
                   minAvailable:
+                    description: MinAvailable is the PodDisruptionBudget minAvailable
+                      value.
                     format: int32
+                    minimum: 0
                     type: integer
                 type: object
               port:
@@ -3051,8 +3108,8 @@ spec:
                     type: object
                   startupProbe:
                     description: |-
-                      Probe describes a health check to be performed against a container to determine whether it is
-                      alive or ready to receive traffic.
+                      StartupProbe replaces the startup probe Kubegres sets on the
+                      PostgreSQL container.
                     properties:
                       exec:
                         description: Exec specifies a command to execute in the container.

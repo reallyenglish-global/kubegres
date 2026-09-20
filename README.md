@@ -11,6 +11,12 @@ See [`docs/cron-tasks.md`](docs/cron-tasks.md) for independent `spec.cronTasks` 
 See [`docs/backup-storage.md`](docs/backup-storage.md) for using an existing
 backup PVC or temporary generic ephemeral storage for backup Pods.
 
+## Container overrides
+
+See [`docs/container-overrides.md`](docs/container-overrides.md) for replacing the
+startup probe (`spec.probe.startupProbe`) and the `preStop` hook
+(`spec.lifecycle.preStop`) on the PostgreSQL container.
+
 ## Voluntary node-drain failover
 
 See [`docs/primary-drain-failover.md`](docs/primary-drain-failover.md) for the opt-in `spec.failover.onPrimaryPodDrain` feature.

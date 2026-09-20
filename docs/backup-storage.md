@@ -44,3 +44,18 @@ PVC first and use `pvcName`.
 
 `size` is required whenever Kubegres needs to provision temporary storage. If a
 named PVC exists, its own capacity is used and `size` is ignored.
+
+## Backup image
+
+Set `spec.backup.image` to run the backup CronJob with a different container
+image than the database, for example an image that bundles `pg_dump` together
+with an object-storage client. When it is empty the database image is used.
+
+```yaml
+spec:
+  backup:
+    schedule: "0 2 * * *"
+    image: ghcr.io/example/postgres-backup:16
+    size: 20Gi
+    volumeMount: /var/backups/postgres
+```

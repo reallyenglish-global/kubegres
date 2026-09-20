@@ -15,6 +15,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	postgresv1 "reactive-tech.io/kubegres/api/v1"
 	resourceConfigs2 "reactive-tech.io/kubegres/internal/test/resourceConfigs"
@@ -55,6 +56,18 @@ var _ = Describe("Primary voluntary disruption failover", Label("core-failover",
 		Expect(primaryPodName).NotTo(BeEmpty())
 		Expect(replicaPodName).NotTo(BeEmpty())
 
+		By("verifying a PodDisruptionBudget protects the cluster while failover.onPrimaryPodDrain is enabled")
+		Eventually(func() bool {
+			pdb, err := resourceRetriever.GetPodDisruptionBudget(kubegres.Name)
+			if err != nil {
+				return false
+			}
+			if pdb.Spec.Selector == nil || pdb.Spec.Selector.MatchLabels["app"] != kubegres.Name {
+				return false
+			}
+			return pdb.Spec.MinAvailable != nil && pdb.Spec.MinAvailable.IntValue() == 1
+		}, time.Minute, 5*time.Second).Should(BeTrue())
+
 		eviction := &policyv1beta1.Eviction{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      primaryPodName,
@@ -75,6 +88,22 @@ var _ = Describe("Primary voluntary disruption failover", Label("core-failover",
 			newPrimaryPodName, newReplicaPodName := podNamesByRole(resources)
 			return newPrimaryPodName == replicaPodName && newReplicaPodName != replicaPodName
 		}, 10*time.Minute, 5*time.Second).Should(BeTrue())
+
+		By("disabling failover.onPrimaryPodDrain and verifying the PodDisruptionBudget is removed")
+		var current *postgresv1.Kubegres
+		Eventually(func() error {
+			var err error
+			current, err = resourceRetriever.GetKubegres()
+			return err
+		}, time.Minute, 5*time.Second).Should(Succeed())
+
+		current.Spec.Failover.OnPrimaryPodDrain = false
+		resourceCreator.UpdateResource(current, "Kubegres")
+
+		Eventually(func() bool {
+			_, err := resourceRetriever.GetPodDisruptionBudget(kubegres.Name)
+			return apierrors.IsNotFound(err)
+		}, time.Minute, 5*time.Second).Should(BeTrue())
 	})
 })
 

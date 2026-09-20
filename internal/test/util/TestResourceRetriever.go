@@ -25,6 +25,8 @@ import (
 	v1 "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -115,6 +117,33 @@ func (r *TestResourceRetriever) GetService(serviceResourceName string) (*core.Se
 func (r *TestResourceRetriever) GetBackUpPvc() (*core.PersistentVolumeClaim, error) {
 	resourceToRetrieve := &core.PersistentVolumeClaim{}
 	err := r.getResource(resourceConfigs.BackUpPvcResourceName, resourceToRetrieve)
+	return resourceToRetrieve, err
+}
+
+// GetCronJobByName retrieves any CronJob by name in the retriever's namespace.
+// It is used both for the fixed-name backup CronJob and for the independent
+// CronJobs created from spec.cronTasks (see docs/cron-tasks.md).
+func (r *TestResourceRetriever) GetCronJobByName(cronJobName string) (*batch.CronJob, error) {
+	resourceToRetrieve := &batch.CronJob{}
+	err := r.getResource(cronJobName, resourceToRetrieve)
+	return resourceToRetrieve, err
+}
+
+// GetStorageClass retrieves a cluster-scoped StorageClass by name.
+func (r *TestResourceRetriever) GetStorageClass(storageClassName string) (*storagev1.StorageClass, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), resourceRetrievalTimeout)
+	defer cancel()
+	resourceToRetrieve := &storagev1.StorageClass{}
+	err := r.client.Get(ctx, types.NamespacedName{Name: storageClassName}, resourceToRetrieve)
+	return resourceToRetrieve, err
+}
+
+// GetPodDisruptionBudget retrieves the PodDisruptionBudget owned by the Kubegres
+// resource with the given name (ServicesCountSpecEnforcer names the PDB after
+// the Kubegres resource it protects).
+func (r *TestResourceRetriever) GetPodDisruptionBudget(kubegresName string) (*policyv1.PodDisruptionBudget, error) {
+	resourceToRetrieve := &policyv1.PodDisruptionBudget{}
+	err := r.getResource(kubegresName, resourceToRetrieve)
 	return resourceToRetrieve, err
 }
 

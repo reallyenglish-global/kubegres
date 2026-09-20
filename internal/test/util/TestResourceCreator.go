@@ -29,8 +29,10 @@ import (
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	postgresv1 "reactive-tech.io/kubegres/api/v1"
@@ -95,6 +97,47 @@ func (r *TestResourceCreator) CreateBackUpPvc() {
 	resourceToCreate := resourceConfigs.LoadBackUpPvcYaml()
 	resourceToCreate.Namespace = r.namespace
 	r.createResourceFromYaml("BackUp PVC", resourceConfigs.BackUpPvcResourceName, &existingResource, resourceToCreate)
+}
+
+// CreateNonExpandableStorageClass clones the "standard" StorageClass used by
+// the test cluster (see suite_test.go, which explicitly turns AllowVolumeExpansion
+// on for "standard") under a different name with AllowVolumeExpansion set to
+// false, so tests can exercise the "StorageClass does not allow volume
+// expansion" code path in StorageClassSizeSpecEnforcer/SpecChecker without
+// mutating the shared "standard" class used by every other spec.
+func (r *TestResourceCreator) CreateNonExpandableStorageClass(storageClassName string) {
+	existingResource := storagev1.StorageClass{}
+	standardStorageClass, err := r.resourceRetriever.GetStorageClass("standard")
+	if err != nil {
+		log.Println("Error while getting 'standard' StorageClass to clone : ", err)
+		gomega.Expect(err).Should(gomega.Succeed())
+		return
+	}
+
+	allowVolumeExpansion := false
+	resourceToCreate := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   storageClassName,
+			Labels: map[string]string{"environment": "acceptancetesting"},
+		},
+		Provisioner:          standardStorageClass.Provisioner,
+		VolumeBindingMode:    standardStorageClass.VolumeBindingMode,
+		ReclaimPolicy:        standardStorageClass.ReclaimPolicy,
+		AllowVolumeExpansion: &allowVolumeExpansion,
+	}
+	r.createResourceFromYaml("Non-expandable StorageClass", storageClassName, &existingResource, resourceToCreate)
+}
+
+// DeleteStorageClass removes a cluster-scoped StorageClass created by a test
+// (StorageClasses are not namespaced, so they are not covered by DeleteAllTestResources).
+func (r *TestResourceCreator) DeleteStorageClass(storageClassName string) {
+	resourceToDelete := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: storageClassName}}
+	ctx := context.Background()
+	err := r.client.Delete(ctx, resourceToDelete)
+	if err != nil && !apierrors.IsNotFound(err) {
+		log.Println("Error while deleting StorageClass '"+storageClassName+"' ", err)
+		gomega.Expect(err).Should(gomega.Succeed())
+	}
 }
 
 func (r *TestResourceCreator) CreateBackUpPvc2() {

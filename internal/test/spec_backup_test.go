@@ -264,6 +264,35 @@ var _ = Describe("Setting Kubegres specs 'backup.*'", Label("storage-config", "s
 		})
 	})
 
+	Context("GIVEN new Kubegres is created with spec 'backup.size' set AND spec 'backup.pvcName' NOT set", func() {
+
+		It("THEN the backup CronJob's Job template should use a generic ephemeral volume of the requested size with 'ttlSecondsAfterFinished' set", func() {
+
+			log.Print("START OF: Test 'GIVEN new Kubegres is created with spec 'backup.size' set AND spec 'backup.pvcName' NOT set'")
+
+			// BLOCKED: as coded today, internal/controller/spec/checker/SpecChecker.go
+			// unconditionally requires 'spec.Backup.PvcName' whenever 'spec.Backup.Schedule'
+			// is set (it never treats 'spec.Backup.Size' as an alternative), so a fatal
+			// "'spec.Backup.PvcName' is undefined" SpecCheckErr event is raised before
+			// reconciliation ever reaches BackUpCronJobCountSpecEnforcer /
+			// ResourcesCreatorFromTemplate.CreateBackUpCronJob, and the ephemeral-volume
+			// code path this spec targets is never exercised end-to-end. That unit-level
+			// behaviour is already covered by
+			// internal/controller/spec/template/backup_volume_test.go, which calls
+			// ResourcesCreatorFromTemplate directly and bypasses SpecChecker.
+			test.givenNewKubegresSpecIsSetTo(ctx.BaseConfigMapName, scheduleBackupEveryMin, "", "/tmp/my-kubegres", 1)
+			test.kubegresResource.Spec.Backup.Size = "1Gi"
+
+			test.whenKubegresIsCreated()
+
+			test.thenPodsStatesShouldBe(1, 0)
+
+			test.thenCronJobUsesEphemeralVolumeWithSize("1Gi")
+
+			log.Print("END OF: Test 'GIVEN new Kubegres is created with spec 'backup.size' set AND spec 'backup.pvcName' NOT set'")
+		})
+	})
+
 })
 
 type SpecBackUpTest struct {
@@ -506,6 +535,53 @@ func (r *SpecBackUpTest) thenCronJobSpecShouldHaveEnvVar(envVarName, envVarVal s
 		log.Println("The container of CronJob'" + backUpCronJob.Name + "' does NOT have the expected environment variable with " +
 			"name: '" + envVarName + "' and value: '" + envVarVal + "' in its Spec.")
 		return false
+
+	}, time.Second*10, time.Second*5).Should(BeTrue())
+}
+
+// thenCronJobUsesEphemeralVolumeWithSize asserts that the backup CronJob's Job
+// template requests a generic ephemeral volume (rather than a direct PVC
+// reference) of the given size, and that completed Jobs/Pods are cleaned up
+// promptly (see ResourcesCreatorFromTemplate.CreateBackUpCronJob).
+func (r *SpecBackUpTest) thenCronJobUsesEphemeralVolumeWithSize(expectedSize string) bool {
+
+	return Eventually(func() bool {
+
+		kubegresResources, err := r.resourceRetriever.GetKubegresResources()
+		if err != nil && !apierrors.IsNotFound(err) {
+			log.Println("ERROR while retrieving Kubegres kubegresResources")
+			return false
+		}
+
+		backUpCronJob := kubegresResources.BackUpCronJob
+		if backUpCronJob.Name == "" {
+			return false
+		}
+
+		volume := backUpCronJob.Spec.JobTemplate.Spec.Template.Spec.Volumes[0]
+		if volume.PersistentVolumeClaim != nil {
+			log.Println("CronJob '" + backUpCronJob.Name + "' unexpectedly references a direct PVC instead of a generic ephemeral volume. Waiting...")
+			return false
+		}
+
+		if volume.Ephemeral == nil || volume.Ephemeral.VolumeClaimTemplate == nil {
+			log.Println("CronJob '" + backUpCronJob.Name + "' does NOT have a generic ephemeral volume yet. Waiting...")
+			return false
+		}
+
+		currentSize := volume.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests[v12.ResourceStorage]
+		if currentSize.String() != expectedSize {
+			log.Println("CronJob '" + backUpCronJob.Name + "' ephemeral volume doesn't have the expected size: '" + expectedSize + "'. " +
+				"Current value: '" + currentSize.String() + "'. Waiting...")
+			return false
+		}
+
+		if backUpCronJob.Spec.JobTemplate.Spec.TTLSecondsAfterFinished == nil {
+			log.Println("CronJob '" + backUpCronJob.Name + "' does NOT have 'ttlSecondsAfterFinished' set. Waiting...")
+			return false
+		}
+
+		return true
 
 	}, time.Second*10, time.Second*5).Should(BeTrue())
 }

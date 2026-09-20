@@ -5,7 +5,11 @@
 `ANALYZE`, vacuum scripts, integrity checks, or application-specific scheduled
 operations. It does **not** change or replace the backup implementation.
 
-Each task must have a unique `name`, a `schedule`, and an `image`. Kubegres
+Each task must have a unique `name`, a `schedule`, and an `image`. The name
+must be a DNS-1123 label (lowercase alphanumerics and `-`, at most 63
+characters) because it becomes part of the CronJob name. `concurrencyPolicy`,
+when set, must be `Allow`, `Forbid`, or `Replace`. The CRD enforces these rules
+at admission, and Kubegres validates them again at reconcile time. Kubegres
 creates a deterministic owned CronJob (`<kubegres>-task-<task>`, with a stable
 hash when the name would exceed the Kubernetes limit), updates it when the task
 changes, and removes it when the task is removed from the Kubegres resource.
