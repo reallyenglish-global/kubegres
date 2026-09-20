@@ -3,6 +3,8 @@ package maintenance
 // PreflightInput contains observations required before a planned promotion.
 // The controller must populate these from Kubernetes and PostgreSQL probes; the
 // gate deliberately does not infer database health from Pod Ready alone.
+// Thresholds must come from EffectiveSafety: an unset (zero) threshold is a
+// misconfiguration and the gate fails closed rather than passing trivially.
 type PreflightInput struct {
 	PrimaryAndReplicaOnDistinctNodes bool
 	ReplicaReady                     bool
@@ -27,8 +29,12 @@ func EvaluatePreflight(input PreflightInput) GateResult {
 		return GateResult{Reason: "replica_not_ready"}
 	case !input.Streaming:
 		return GateResult{Reason: "replication_not_streaming"}
+	case input.MaxReplayLagSeconds <= 0:
+		return GateResult{Reason: "replay_lag_threshold_unconfigured"}
 	case input.ReplayLagSeconds > input.MaxReplayLagSeconds:
 		return GateResult{Reason: "replay_lag_exceeds_threshold"}
+	case input.RequiredStableSeconds <= 0:
+		return GateResult{Reason: "stability_window_unconfigured"}
 	case input.StableObservationSeconds < input.RequiredStableSeconds:
 		return GateResult{Reason: "stability_window_incomplete"}
 	case !input.WithinDeadline:

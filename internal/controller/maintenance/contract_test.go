@@ -52,3 +52,27 @@ func TestScaleDeferredRequiresMatchingObservedGeneration(t *testing.T) {
 		t.Fatal("generation change must not be silently deferred")
 	}
 }
+
+func TestEffectiveSafetyAppliesApprovedDefaults(t *testing.T) {
+	got := EffectiveSafety(kubegresv1.MaintenanceSafetyPolicy{})
+	want := kubegresv1.MaintenanceSafetyPolicy{MaxReplayLagSeconds: 5, StableForSeconds: 60, RelocationDeadlineSeconds: 900}
+	if got != want {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	explicit := kubegresv1.MaintenanceSafetyPolicy{MaxReplayLagSeconds: 2, StableForSeconds: 30, RelocationDeadlineSeconds: 120}
+	if got := EffectiveSafety(explicit); got != explicit {
+		t.Fatalf("explicit policy overridden: got %+v", got)
+	}
+}
+
+func TestValidateOperationRejectsNegativeSafetyThresholds(t *testing.T) {
+	now := time.Date(2026, 9, 18, 12, 0, 0, 0, time.UTC)
+	op := &kubegresv1.MaintenanceOperation{Spec: kubegresv1.MaintenanceOperationSpec{
+		KubegresRef: kubegresv1.MaintenanceKubegresReference{Name: "db"}, Purpose: kubegresv1.NodeUpgrade,
+		TargetNode: kubegresv1.MaintenanceNodeReference{UID: "uid"}, ExpiresAt: metav1.NewTime(now.Add(time.Hour)),
+		Safety: kubegresv1.MaintenanceSafetyPolicy{StableForSeconds: -1},
+	}}
+	if err := ValidateOperation(op, now); err == nil {
+		t.Fatal("expected validation error for negative stableForSeconds")
+	}
+}

@@ -41,3 +41,21 @@ func TestEvaluateFencingRequiresBothProofs(t *testing.T) {
 		t.Fatalf("valid fencing rejected: %#v", got)
 	}
 }
+
+func TestEvaluatePreflightFailsClosedWhenThresholdsUnset(t *testing.T) {
+	base := PreflightInput{PrimaryAndReplicaOnDistinctNodes: true, ReplicaReady: true, Streaming: true, ReplayLagSeconds: 0, MaxReplayLagSeconds: 5, StableObservationSeconds: 60, RequiredStableSeconds: 60, WithinDeadline: true}
+	t.Run("stability window unset", func(t *testing.T) {
+		in := base
+		in.RequiredStableSeconds = 0
+		if got := EvaluatePreflight(in); got.Allowed || got.Reason != "stability_window_unconfigured" {
+			t.Fatalf("got %#v", got)
+		}
+	})
+	t.Run("replay lag threshold unset", func(t *testing.T) {
+		in := base
+		in.MaxReplayLagSeconds = 0
+		if got := EvaluatePreflight(in); got.Allowed || got.Reason != "replay_lag_threshold_unconfigured" {
+			t.Fatalf("got %#v", got)
+		}
+	})
+}

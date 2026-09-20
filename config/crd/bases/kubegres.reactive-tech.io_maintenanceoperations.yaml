@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: maintenanceoperations.kubegres.reactive-tech.io
 spec:
   group: kubegres.reactive-tech.io
@@ -59,6 +59,9 @@ spec:
               expiresAt:
                 format: date-time
                 type: string
+                x-kubernetes-validations:
+                - message: expiresAt is immutable
+                  rule: self == oldSelf
               kubegresRef:
                 properties:
                   name:
@@ -74,21 +77,34 @@ spec:
                 - node-maintenance
                 - node-rotation
                 type: string
+                x-kubernetes-validations:
+                - message: purpose is immutable
+                  rule: self == oldSelf
               requesterIdentity:
                 description: |-
                   RequesterIdentity preserves the human or workflow identity behind the
                   approved service-account request.
                 type: string
               safety:
+                default: {}
+                description: |-
+                  MaintenanceSafetyPolicy holds the promotion gate thresholds. Defaults are the
+                  approved 5-second / 60-second / 15-minute values.
                 properties:
                   maxReplayLagSeconds:
+                    default: 5
                     format: int32
+                    minimum: 0
                     type: integer
                   relocationDeadlineSeconds:
+                    default: 900
                     format: int32
+                    minimum: 0
                     type: integer
                   stableForSeconds:
+                    default: 60
                     format: int32
+                    minimum: 0
                     type: integer
                 type: object
               targetNode:
@@ -100,6 +116,9 @@ spec:
                       identity.
                     minLength: 1
                     type: string
+                    x-kubernetes-validations:
+                    - message: targetNode.uid is immutable
+                      rule: self == oldSelf
                 required:
                 - uid
                 type: object

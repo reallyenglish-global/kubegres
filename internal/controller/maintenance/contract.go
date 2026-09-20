@@ -30,6 +30,10 @@ func ValidateOperation(op *kubegresv1.MaintenanceOperation, now time.Time) error
 	if !now.IsZero() && !now.Before(op.Spec.ExpiresAt.Time) {
 		return fmt.Errorf("maintenance operation has expired")
 	}
+	safety := op.Spec.Safety
+	if safety.MaxReplayLagSeconds < 0 || safety.StableForSeconds < 0 || safety.RelocationDeadlineSeconds < 0 {
+		return fmt.Errorf("safety thresholds must not be negative")
+	}
 	return nil
 }
 
@@ -37,4 +41,27 @@ func ValidateOperation(op *kubegresv1.MaintenanceOperation, now time.Time) error
 // to an active maintenance operation for the referenced Kubegres generation.
 func ScaleDeferred(op *kubegresv1.MaintenanceOperation, kubegresGeneration int64) bool {
 	return IsActive(op) && op.Status.ObservedKubegresGeneration != 0 && op.Status.ObservedKubegresGeneration == kubegresGeneration
+}
+
+// Approved safety thresholds. They are also declared as CRD defaults so a
+// stored object carries them; EffectiveSafety covers objects built in-process.
+const (
+	DefaultMaxReplayLagSeconds       int32 = 5
+	DefaultStableForSeconds          int32 = 60
+	DefaultRelocationDeadlineSeconds int32 = 900
+)
+
+// EffectiveSafety returns the safety policy with approved defaults applied to
+// any unset threshold.
+func EffectiveSafety(policy kubegresv1.MaintenanceSafetyPolicy) kubegresv1.MaintenanceSafetyPolicy {
+	if policy.MaxReplayLagSeconds == 0 {
+		policy.MaxReplayLagSeconds = DefaultMaxReplayLagSeconds
+	}
+	if policy.StableForSeconds == 0 {
+		policy.StableForSeconds = DefaultStableForSeconds
+	}
+	if policy.RelocationDeadlineSeconds == 0 {
+		policy.RelocationDeadlineSeconds = DefaultRelocationDeadlineSeconds
+	}
+	return policy
 }

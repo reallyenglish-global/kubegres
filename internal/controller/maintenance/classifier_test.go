@@ -50,3 +50,46 @@ func TestMaintenanceOperationIsActive(t *testing.T) {
 		}
 	}
 }
+
+func TestClassifyPodLossInvoluntaryDisruptionIsNotDirectDelete(t *testing.T) {
+	deleted := metav1.NewTime(time.Date(2026, 9, 18, 12, 0, 0, 0, time.UTC))
+	for _, reason := range []string{"DeletionByTaintManager", "TerminationByKubelet"} {
+		t.Run("primary "+reason, func(t *testing.T) {
+			got := ClassifyPodLoss(Input{Primary: true, NodeUnreachable: true, PodDeletionTimestamp: &deleted, DisruptionReason: reason})
+			if got.Class != PrimaryFailure {
+				t.Fatalf("class = %q, want %q (source=%q)", got.Class, PrimaryFailure, got.Source)
+			}
+		})
+		t.Run("replica "+reason, func(t *testing.T) {
+			got := ClassifyPodLoss(Input{PodDeletionTimestamp: &deleted, DisruptionReason: reason})
+			if got.Class == PodDelete {
+				t.Fatalf("involuntary disruption %q was classified as direct delete", reason)
+			}
+		})
+	}
+	t.Run("primary on unreachable node with deletion timestamp", func(t *testing.T) {
+		got := ClassifyPodLoss(Input{Primary: true, NodeUnreachable: true, PodDeletionTimestamp: &deleted})
+		if got.Class != PrimaryFailure {
+			t.Fatalf("class = %q, want %q (source=%q)", got.Class, PrimaryFailure, got.Source)
+		}
+	})
+}
+
+func TestClassifyPodLossCorrelatesInvoluntaryDisruptionWithActiveOperation(t *testing.T) {
+	now := time.Date(2026, 9, 18, 12, 0, 0, 0, time.UTC)
+	deleted := metav1.NewTime(now)
+	op := &kubegresv1.MaintenanceOperation{Spec: kubegresv1.MaintenanceOperationSpec{Purpose: kubegresv1.NodeUpgrade, TargetNode: kubegresv1.MaintenanceNodeReference{UID: "node-uid"}, ExpiresAt: metav1.NewTime(now.Add(time.Hour))}}
+	got := ClassifyPodLoss(Input{Now: now, Operation: op, PodNodeUID: "node-uid", PodDeletionTimestamp: &deleted, DisruptionReason: "DeletionByTaintManager"})
+	if got.Class != NodeUpgrade {
+		t.Fatalf("class = %q, want %q (source=%q)", got.Class, NodeUpgrade, got.Source)
+	}
+}
+
+func TestClassifyPodLossRecordsEvidence(t *testing.T) {
+	got := ClassifyPodLoss(Input{Primary: true, NodeUnreachable: true, PodNodeUID: "node-uid", DisruptionReason: "DeletionByTaintManager"})
+	for key, want := range map[string]string{"disruption_reason": "DeletionByTaintManager", "node_uid": "node-uid", "primary": "true", "node_unreachable": "true"} {
+		if got.Evidence[key] != want {
+			t.Errorf("evidence[%q] = %q, want %q", key, got.Evidence[key], want)
+		}
+	}
+}

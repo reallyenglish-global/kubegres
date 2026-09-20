@@ -30,6 +30,7 @@ type MaintenanceNodeReference struct {
 	Name string `json:"name,omitempty"`
 	// UID is immutable and is the authoritative target identity.
 	//+kubebuilder:validation:MinLength=1
+	//+kubebuilder:validation:XValidation:rule="self == oldSelf",message="targetNode.uid is immutable"
 	UID string `json:"uid"`
 }
 
@@ -37,9 +38,17 @@ type MaintenanceKubegresReference struct {
 	Name string `json:"name"`
 }
 
+// MaintenanceSafetyPolicy holds the promotion gate thresholds. Defaults are the
+// approved 5-second / 60-second / 15-minute values.
 type MaintenanceSafetyPolicy struct {
-	MaxReplayLagSeconds       int32 `json:"maxReplayLagSeconds,omitempty"`
-	StableForSeconds          int32 `json:"stableForSeconds,omitempty"`
+	//+kubebuilder:default=5
+	//+kubebuilder:validation:Minimum=0
+	MaxReplayLagSeconds int32 `json:"maxReplayLagSeconds,omitempty"`
+	//+kubebuilder:default=60
+	//+kubebuilder:validation:Minimum=0
+	StableForSeconds int32 `json:"stableForSeconds,omitempty"`
+	//+kubebuilder:default=900
+	//+kubebuilder:validation:Minimum=0
 	RelocationDeadlineSeconds int32 `json:"relocationDeadlineSeconds,omitempty"`
 }
 
@@ -47,10 +56,13 @@ type MaintenanceSafetyPolicy struct {
 type MaintenanceOperationSpec struct {
 	KubegresRef MaintenanceKubegresReference `json:"kubegresRef"`
 	//+kubebuilder:validation:Enum=node-upgrade;node-maintenance;node-rotation
+	//+kubebuilder:validation:XValidation:rule="self == oldSelf",message="purpose is immutable"
 	Purpose    MaintenancePurpose       `json:"purpose"`
 	TargetNode MaintenanceNodeReference `json:"targetNode"`
-	ExpiresAt  metav1.Time              `json:"expiresAt"`
-	Safety     MaintenanceSafetyPolicy  `json:"safety,omitempty"`
+	//+kubebuilder:validation:XValidation:rule="self == oldSelf",message="expiresAt is immutable"
+	ExpiresAt metav1.Time `json:"expiresAt"`
+	//+kubebuilder:default={}
+	Safety MaintenanceSafetyPolicy `json:"safety,omitempty"`
 	// RequesterIdentity preserves the human or workflow identity behind the
 	// approved service-account request.
 	RequesterIdentity string `json:"requesterIdentity,omitempty"`
