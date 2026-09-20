@@ -53,6 +53,8 @@ spec:
   #backup:
   #  schedule: "*/5 * * * *"
   #  pvcName: backup
+  #  # If pvcName is omitted or missing, Kubegres provisions temporary storage.
+  #  size: 20Gi
   #  volumeMount: /tmp/mypostgres
 
   #imagePullSecrets:

@@ -33,6 +33,10 @@ type KubegresBackUp struct {
 	Schedule    string `json:"schedule,omitempty"`
 	VolumeMount string `json:"volumeMount,omitempty"`
 	PvcName     string `json:"pvcName,omitempty"`
+	// Size requests a generic ephemeral PVC for the backup Pod when PvcName is
+	// empty or names a PVC that does not exist. The ephemeral PVC is deleted
+	// with the Pod, so backup scripts must copy data to durable storage.
+	Size string `json:"size,omitempty"`
 	// Image is the container image used by the backup CronJob. When empty,
 	// the database image is used for backwards compatibility.
 	Image string `json:"image,omitempty"`

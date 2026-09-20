@@ -21,6 +21,7 @@ limitations under the License.
 package template
 
 import (
+	"fmt"
 	"strconv"
 
 	"reactive-tech.io/kubegres/internal/controller/ctx"
@@ -132,7 +133,7 @@ func (r *ResourcesCreatorFromTemplate) CreateReplicaStatefulSet(statefulSetInsta
 	return statefulSetTemplate, nil
 }
 
-func (r *ResourcesCreatorFromTemplate) CreateBackUpCronJob(configMapNameForBackUp string) (batch.CronJob, error) {
+func (r *ResourcesCreatorFromTemplate) CreateBackUpCronJob(configMapNameForBackUp string, useEphemeralVolume bool) (batch.CronJob, error) {
 
 	backUpCronJob, err := r.templateFromFiles.LoadBackUpCronJob()
 	if err != nil {
@@ -153,7 +154,30 @@ func (r *ResourcesCreatorFromTemplate) CreateBackUpCronJob(configMapNameForBackU
 
 	backUpCronJobSpec := &backUpCronJob.Spec.JobTemplate.Spec.Template.Spec
 
-	backUpCronJobSpec.Volumes[0].PersistentVolumeClaim.ClaimName = backupSpec.PvcName
+	if useEphemeralVolume {
+		if backupSpec.Size == "" {
+			return batch.CronJob{}, fmt.Errorf("spec.backup.size is required when the backup PVC is not available")
+		}
+		storageSize, err := resource.ParseQuantity(backupSpec.Size)
+		if err != nil {
+			return batch.CronJob{}, fmt.Errorf("invalid spec.backup.size %q: %w", backupSpec.Size, err)
+		}
+		backUpCronJobSpec.Volumes[0].PersistentVolumeClaim = nil
+		backUpCronJobSpec.Volumes[0].Ephemeral = &core.EphemeralVolumeSource{
+			VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+				Spec: core.PersistentVolumeClaimSpec{
+					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+					Resources:   core.VolumeResourceRequirements{Requests: core.ResourceList{core.ResourceStorage: storageSize}},
+				},
+			},
+		}
+		// Delete the completed Job and Pod promptly so the generic ephemeral PVC
+		// is also released after the backup attempt finishes.
+		ttlSecondsAfterFinished := int32(0)
+		backUpCronJob.Spec.JobTemplate.Spec.TTLSecondsAfterFinished = &ttlSecondsAfterFinished
+	} else {
+		backUpCronJobSpec.Volumes[0].PersistentVolumeClaim.ClaimName = backupSpec.PvcName
+	}
 	backUpCronJobSpec.Volumes[1].ConfigMap.Name = configMapNameForBackUp
 
 	backUpCronJobContainer := &backUpCronJobSpec.Containers[0]

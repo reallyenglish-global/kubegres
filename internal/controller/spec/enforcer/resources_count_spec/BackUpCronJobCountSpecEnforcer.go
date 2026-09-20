@@ -22,6 +22,9 @@ package resources_count_spec
 
 import (
 	batch "k8s.io/api/batch/v1"
+	core "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 	"reactive-tech.io/kubegres/internal/controller/spec/template"
 	states2 "reactive-tech.io/kubegres/internal/controller/states"
@@ -63,13 +66,39 @@ func (r *BackUpCronJobCountSpecEnforcer) EnforceSpec() error {
 	}
 
 	configMapNameForBackUp := r.getConfigMapNameForBackUp(r.resourcesStates.Config)
-	cronJob, err := r.resourcesCreator.CreateBackUpCronJob(configMapNameForBackUp)
+	useEphemeralVolume, err := r.shouldUseEphemeralVolume()
+	if err != nil {
+		return err
+	}
+	cronJob, err := r.resourcesCreator.CreateBackUpCronJob(configMapNameForBackUp, useEphemeralVolume)
 	if err != nil {
 		r.kubegresContext.Log.ErrorEvent("BackUpCronJobTemplateErr", err, "Unable to create a BackUp CronJob object from template.")
 		return err
 	}
 
 	return r.deployCronJob(cronJob)
+}
+
+// shouldUseEphemeralVolume keeps an existing configured PVC as the durable
+// backup destination, while allowing a backup to provision temporary storage
+// when the PVC is omitted or has not been created yet. Generic ephemeral
+// volumes are owned by the Pod and are cleaned up with it.
+func (r *BackUpCronJobCountSpecEnforcer) shouldUseEphemeralVolume() (bool, error) {
+	pvcName := r.kubegresContext.Kubegres.Spec.Backup.PvcName
+	if pvcName == "" {
+		return true, nil
+	}
+
+	pvc := &core.PersistentVolumeClaim{}
+	err := r.kubegresContext.Client.Get(r.kubegresContext.Ctx,
+		types.NamespacedName{Namespace: r.kubegresContext.Kubegres.Namespace, Name: pvcName}, pvc)
+	if err == nil {
+		return false, nil
+	}
+	if apierrors.IsNotFound(err) {
+		return true, nil
+	}
+	return false, err
 }
 
 func (r *BackUpCronJobCountSpecEnforcer) getConfigMapNameForBackUp(configStates states2.ConfigStates) string {
@@ -121,11 +150,32 @@ func (r *BackUpCronJobCountSpecEnforcer) hasSpecChanged() (hasSpecChanged bool) 
 		r.logSpecChange("spec.backup.volumeMount")
 	}
 
-	currentPvcName := cronJobTemplateSpec.Volumes[0].PersistentVolumeClaim.ClaimName
+	currentPvcName := ""
+	currentUsesEphemeral := cronJobTemplateSpec.Volumes[0].Ephemeral != nil
+	if cronJobTemplateSpec.Volumes[0].PersistentVolumeClaim != nil {
+		currentPvcName = cronJobTemplateSpec.Volumes[0].PersistentVolumeClaim.ClaimName
+	}
 	expectedPvcName := kubegresBackUpSpec.PvcName
-	if currentPvcName != expectedPvcName {
+	expectedUsesEphemeral := expectedPvcName == ""
+	if expectedPvcName != "" {
+		usesEphemeral, err := r.shouldUseEphemeralVolume()
+		if err == nil {
+			expectedUsesEphemeral = usesEphemeral
+		}
+	}
+	if currentPvcName != expectedPvcName || currentUsesEphemeral != expectedUsesEphemeral {
 		hasSpecChanged = true
 		r.logSpecChange("spec.backup.pvcName")
+	}
+	if expectedUsesEphemeral && kubegresBackUpSpec.Size != "" {
+		currentSize := ""
+		if currentUsesEphemeral && cronJobTemplateSpec.Volumes[0].Ephemeral.VolumeClaimTemplate != nil {
+			currentSize = cronJobTemplateSpec.Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests.Storage().String()
+		}
+		if currentSize != kubegresBackUpSpec.Size {
+			hasSpecChanged = true
+			r.logSpecChange("spec.backup.size")
+		}
 	}
 
 	currentImage := cronJobTemplateSpec.Containers[0].Image
