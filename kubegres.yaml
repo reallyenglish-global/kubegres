@@ -4498,7 +4498,7 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: reactivetechio/kubegres:1.19
+        image: ghcr.io/reallyenglish-global/kubegres:v1.21
         livenessProbe:
           httpGet:
             path: /healthz
