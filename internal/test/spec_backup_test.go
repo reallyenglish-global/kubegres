@@ -28,6 +28,7 @@ import (
 	"log"
 	postgresv1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
+	"reactive-tech.io/kubegres/internal/controller/spec/checker"
 	resourceConfigs2 "reactive-tech.io/kubegres/internal/test/resourceConfigs"
 	util2 "reactive-tech.io/kubegres/internal/test/util"
 	"reactive-tech.io/kubegres/internal/test/util/testcases"
@@ -370,7 +371,7 @@ func (r *SpecBackUpTest) thenBackupStorageErrorEventShouldBeLogged() {
 	expectedErrorEvent := util2.EventRecord{
 		Eventtype: v12.EventTypeWarning,
 		Reason:    "SpecCheckErr",
-		Message:   "In the Resources Spec a backup schedule is set but neither 'spec.Backup.PvcName' nor 'spec.Backup.Size' is defined. Set 'spec.Backup.PvcName' to use an existing PersistentVolumeClaim or 'spec.Backup.Size' to use temporary storage.",
+		Message:   checker.ErrMsgBackupStorageUndefined,
 	}
 	Eventually(func() bool {
 		_, err := r.resourceRetriever.GetKubegres()
@@ -386,7 +387,7 @@ func (r *SpecBackUpTest) thenErrorEventSayingPvcIsNotDeployed() {
 	expectedErrorEvent := util2.EventRecord{
 		Eventtype: v12.EventTypeWarning,
 		Reason:    "SpecCheckErr",
-		Message:   "In the Resources Spec the value of 'spec.Backup.PvcName' has a PersistentVolumeClaim name which is not deployed. Please deploy this PersistentVolumeClaim, otherwise this operator cannot work correctly.",
+		Message:   checker.ErrMsgBackupPvcNotDeployed,
 	}
 	Eventually(func() bool {
 		_, err := r.resourceRetriever.GetKubegres()

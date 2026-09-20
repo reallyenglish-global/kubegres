@@ -214,6 +214,15 @@ func (r *SpecChecker) updateKubegresSpec(specName string, specValue string) {
 	}
 }
 
+// Backup storage error messages are exported so integration tests can assert
+// the exact event text without duplicating it.
+const (
+	ErrMsgBackupStorageUndefined = "In the Resources Spec a backup schedule is set but neither 'spec.Backup.PvcName' nor 'spec.Backup.Size' is defined. " +
+		"Set 'spec.Backup.PvcName' to use an existing PersistentVolumeClaim or 'spec.Backup.Size' to use temporary storage."
+	ErrMsgBackupPvcNotDeployed = "In the Resources Spec the value of 'spec.Backup.PvcName' has a PersistentVolumeClaim name which is not deployed. " +
+		"Please deploy this PersistentVolumeClaim or set 'spec.Backup.Size' to use temporary storage, otherwise this operator cannot work correctly."
+)
+
 // backupSpecError validates a scheduled backup. Storage may be an existing
 // PVC (spec.Backup.PvcName) or a generic ephemeral PVC (spec.Backup.Size); when
 // a named PVC is not deployed, Size is used to provision the temporary claim.
@@ -226,12 +235,10 @@ func (r *SpecChecker) backupSpecError(spec *postgresV1.KubegresSpec) string {
 		return "In the Resources Spec the value of 'spec.Backup.VolumeMount' is undefined. Please set a value otherwise this operator cannot work correctly."
 	}
 	if spec.Backup.PvcName == emptyStr && spec.Backup.Size == emptyStr {
-		return "In the Resources Spec a backup schedule is set but neither 'spec.Backup.PvcName' nor 'spec.Backup.Size' is defined. " +
-			"Set 'spec.Backup.PvcName' to use an existing PersistentVolumeClaim or 'spec.Backup.Size' to use temporary storage."
+		return ErrMsgBackupStorageUndefined
 	}
 	if spec.Backup.PvcName != emptyStr && !r.isBackUpPvcDeployed() && spec.Backup.Size == emptyStr {
-		return "In the Resources Spec the value of 'spec.Backup.PvcName' has a PersistentVolumeClaim name which is not deployed. " +
-			"Please deploy this PersistentVolumeClaim or set 'spec.Backup.Size' to use temporary storage, otherwise this operator cannot work correctly."
+		return ErrMsgBackupPvcNotDeployed
 	}
 	return ""
 }
