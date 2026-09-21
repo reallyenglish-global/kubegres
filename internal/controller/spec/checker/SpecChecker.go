@@ -168,24 +168,9 @@ func (r *SpecChecker) CheckSpec() (SpecCheckResult, error) {
 		specCheckResult.FatalErrorMessage = r.createErrMsgSpecUndefined("spec.image")
 	}
 
-	if r.isBackUpConfigured(spec) {
-
-		if spec.Backup.VolumeMount == emptyStr {
-			specCheckResult.HasSpecFatalError = true
-			specCheckResult.FatalErrorMessage = r.createErrMsgSpecUndefined("spec.Backup.VolumeMount")
-		}
-
-		if spec.Backup.PvcName == emptyStr {
-			specCheckResult.HasSpecFatalError = true
-			specCheckResult.FatalErrorMessage = r.createErrMsgSpecUndefined("spec.Backup.PvcName")
-		}
-
-		if spec.Backup.PvcName != emptyStr && !r.isBackUpPvcDeployed() {
-			specCheckResult.HasSpecFatalError = true
-			specCheckResult.FatalErrorMessage = r.logSpecErrMsg("In the Resources Spec the value of " +
-				"'spec.Backup.PvcName' has a PersistentVolumeClaim name which is not deployed. Please deploy this " +
-				"PersistentVolumeClaim, otherwise this operator cannot work correctly.")
-		}
+	if errMsg := r.backupSpecError(spec); errMsg != "" {
+		specCheckResult.HasSpecFatalError = true
+		specCheckResult.FatalErrorMessage = r.logSpecErrMsg(errMsg)
 	}
 
 	reservedVolumeName := r.doCustomVolumeClaimTemplatesHaveReservedName()
@@ -227,6 +212,35 @@ func (r *SpecChecker) updateKubegresSpec(specName string, specValue string) {
 	if err != nil {
 		r.kubegresContext.Log.Error(err, "Unable to rollback the value of '"+specName+"' to '"+specValue+"'")
 	}
+}
+
+// Backup storage error messages are exported so integration tests can assert
+// the exact event text without duplicating it.
+const (
+	ErrMsgBackupStorageUndefined = "In the Resources Spec a backup schedule is set but neither 'spec.Backup.PvcName' nor 'spec.Backup.Size' is defined. " +
+		"Set 'spec.Backup.PvcName' to use an existing PersistentVolumeClaim or 'spec.Backup.Size' to use temporary storage."
+	ErrMsgBackupPvcNotDeployed = "In the Resources Spec the value of 'spec.Backup.PvcName' has a PersistentVolumeClaim name which is not deployed. " +
+		"Please deploy this PersistentVolumeClaim or set 'spec.Backup.Size' to use temporary storage, otherwise this operator cannot work correctly."
+)
+
+// backupSpecError validates a scheduled backup. Storage may be an existing
+// PVC (spec.Backup.PvcName) or a generic ephemeral PVC (spec.Backup.Size); when
+// a named PVC is not deployed, Size is used to provision the temporary claim.
+func (r *SpecChecker) backupSpecError(spec *postgresV1.KubegresSpec) string {
+	if !r.isBackUpConfigured(spec) {
+		return ""
+	}
+	const emptyStr = ""
+	if spec.Backup.VolumeMount == emptyStr {
+		return "In the Resources Spec the value of 'spec.Backup.VolumeMount' is undefined. Please set a value otherwise this operator cannot work correctly."
+	}
+	if spec.Backup.PvcName == emptyStr && spec.Backup.Size == emptyStr {
+		return ErrMsgBackupStorageUndefined
+	}
+	if spec.Backup.PvcName != emptyStr && !r.isBackUpPvcDeployed() && spec.Backup.Size == emptyStr {
+		return ErrMsgBackupPvcNotDeployed
+	}
+	return ""
 }
 
 func (r *SpecChecker) isBackUpConfigured(spec *postgresV1.KubegresSpec) bool {

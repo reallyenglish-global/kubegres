@@ -111,7 +111,40 @@ var _ = Describe("Setting Kubegres specs 'database.size'", Label("database-specs
 		})
 	})
 
+	Context("GIVEN new Kubegres is created with spec 'database.storageClassName' set to a StorageClass which does NOT allow volume expansion AND later spec 'database.size' is increased", func() {
+
+		It("THEN an error event should be logged saying the storage size cannot be changed AND the PVC size should remain unchanged", func() {
+
+			log.Print("START OF: Test 'GIVEN new Kubegres is created with a non-expandable StorageClass AND later spec 'database.size' is increased'")
+
+			test.resourceCreator.CreateNonExpandableStorageClass(nonExpandableStorageClassName)
+			DeferCleanup(func() {
+				test.resourceCreator.DeleteStorageClass(nonExpandableStorageClassName)
+			})
+
+			test.givenNewKubegresSpecIsSetToWithStorageClass("100Mi", nonExpandableStorageClassName, 1)
+
+			test.whenKubegresIsCreated()
+
+			test.thenPodsStatesShouldBe("100Mi", 1, 0)
+
+			test.givenExistingKubegresSpecIsSetTo("200Mi")
+
+			test.whenKubernetesIsUpdated()
+
+			test.thenErrorEventShouldBeLoggedSayingCannotChangeStorageSize("100Mi", "200Mi")
+
+			test.thenPodsStatesShouldBe("100Mi", 1, 0)
+
+			test.thenDeployedKubegresSpecShouldBeSetTo("100Mi")
+
+			log.Print("END OF: Test 'GIVEN new Kubegres is created with a non-expandable StorageClass AND later spec 'database.size' is increased'")
+		})
+	})
+
 })
+
+const nonExpandableStorageClassName = "kubegres-test-no-expand"
 
 type SpecDatabaseSizeTest struct {
 	keepCreatedResourcesForNextTest bool
@@ -124,6 +157,13 @@ type SpecDatabaseSizeTest struct {
 func (r *SpecDatabaseSizeTest) givenNewKubegresSpecIsSetTo(databaseSize string, specNbreReplicas int32) {
 	r.kubegresResource = resourceConfigs2.LoadKubegresYaml()
 	r.kubegresResource.Spec.Database.Size = databaseSize
+	r.kubegresResource.Spec.Replicas = &specNbreReplicas
+}
+
+func (r *SpecDatabaseSizeTest) givenNewKubegresSpecIsSetToWithStorageClass(databaseSize, storageClassName string, specNbreReplicas int32) {
+	r.kubegresResource = resourceConfigs2.LoadKubegresYaml()
+	r.kubegresResource.Spec.Database.Size = databaseSize
+	r.kubegresResource.Spec.Database.StorageClassName = &storageClassName
 	r.kubegresResource.Spec.Replicas = &specNbreReplicas
 }
 

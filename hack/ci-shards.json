@@ -35,10 +35,10 @@
     },
     {
       "file": "spec_backup_test.go",
-      "specs": 10,
+      "specs": 11,
       "observed_samples": 8,
       "observed_median_seconds": 191.1,
-      "estimated_seconds": 2400.4,
+      "estimated_seconds": 2640.4,
       "shard": "shard-1"
     },
     {
@@ -91,10 +91,10 @@
     },
     {
       "file": "spec_databaseSize_test.go",
-      "specs": 3,
+      "specs": 4,
       "observed_samples": 6,
       "observed_median_seconds": 10.0,
-      "estimated_seconds": 720,
+      "estimated_seconds": 960,
       "shard": "shard-9"
     },
     {
@@ -232,6 +232,30 @@
       "observed_median_seconds": null,
       "estimated_seconds": 300,
       "shard": "shard-5"
+    },
+    {
+      "file": "spec_preStop_test.go",
+      "specs": 2,
+      "observed_samples": 0,
+      "observed_median_seconds": null,
+      "estimated_seconds": 480,
+      "shard": "shard-7"
+    },
+    {
+      "file": "spec_startupProbe_test.go",
+      "specs": 2,
+      "observed_samples": 0,
+      "observed_median_seconds": null,
+      "estimated_seconds": 480,
+      "shard": "shard-10"
+    },
+    {
+      "file": "spec_cronTasks_test.go",
+      "specs": 3,
+      "observed_samples": 0,
+      "observed_median_seconds": null,
+      "estimated_seconds": 720,
+      "shard": "shard-6"
     }
   ]
 }

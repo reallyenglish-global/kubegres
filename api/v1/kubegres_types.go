@@ -36,6 +36,7 @@ type KubegresBackUp struct {
 	// Size requests a generic ephemeral PVC for the backup Pod when PvcName is
 	// empty or names a PVC that does not exist. The ephemeral PVC is deleted
 	// with the Pod, so backup scripts must copy data to durable storage.
+	//+kubebuilder:validation:Pattern=`^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$`
 	Size string `json:"size,omitempty"`
 	// Image is the container image used by the backup CronJob. When empty,
 	// the database image is used for backwards compatibility.
@@ -44,26 +45,59 @@ type KubegresBackUp struct {
 
 // KubegresCronTaskScript mounts one ConfigMap key as a file in a CronTask container.
 type KubegresCronTaskScript struct {
-	ConfigMapName string `json:"configMapName,omitempty"`
-	Key           string `json:"key,omitempty"`
-	MountPath     string `json:"mountPath,omitempty"`
+	// ConfigMapName is the ConfigMap holding the script.
+	//+kubebuilder:validation:Required
+	//+kubebuilder:validation:MinLength=1
+	ConfigMapName string `json:"configMapName"`
+	// Key is the ConfigMap key whose content is mounted.
+	//+kubebuilder:validation:Required
+	//+kubebuilder:validation:MinLength=1
+	Key string `json:"key"`
+	// MountPath is the file path the script is mounted at in the container.
+	//+kubebuilder:validation:Required
+	//+kubebuilder:validation:MinLength=1
+	MountPath string `json:"mountPath"`
 }
 
 // KubegresCronTask defines an independent, Kubegres-owned CronJob. It is
 // intentionally separate from Backup so existing backup behaviour is unchanged.
 type KubegresCronTask struct {
-	Name                       string                  `json:"name,omitempty"`
-	Schedule                   string                  `json:"schedule,omitempty"`
-	Image                      string                  `json:"image,omitempty"`
-	Command                    []string                `json:"command,omitempty"`
-	Args                       []string                `json:"args,omitempty"`
-	Script                     *KubegresCronTaskScript `json:"script,omitempty"`
-	Env                        []v1.EnvVar             `json:"env,omitempty"`
-	Volumes                    []v1.Volume             `json:"volumes,omitempty"`
-	VolumeMounts               []v1.VolumeMount        `json:"volumeMounts,omitempty"`
-	ConcurrencyPolicy          string                  `json:"concurrencyPolicy,omitempty"`
-	SuccessfulJobsHistoryLimit *int32                  `json:"successfulJobsHistoryLimit,omitempty"`
-	FailedJobsHistoryLimit     *int32                  `json:"failedJobsHistoryLimit,omitempty"`
+	// Name identifies the task and forms the CronJob name. It must be a
+	// DNS-1123 label and unique within cronTasks.
+	//+kubebuilder:validation:Required
+	//+kubebuilder:validation:MinLength=1
+	//+kubebuilder:validation:MaxLength=63
+	//+kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Name string `json:"name"`
+	// Schedule is the cron expression passed to the CronJob.
+	//+kubebuilder:validation:Required
+	//+kubebuilder:validation:MinLength=1
+	Schedule string `json:"schedule"`
+	// Image is the container image the task runs.
+	//+kubebuilder:validation:Required
+	//+kubebuilder:validation:MinLength=1
+	Image string `json:"image"`
+	// Command overrides the image entrypoint.
+	Command []string `json:"command,omitempty"`
+	// Args are passed to the entrypoint.
+	Args []string `json:"args,omitempty"`
+	// Script mounts one ConfigMap key as a file in the task container.
+	Script *KubegresCronTaskScript `json:"script,omitempty"`
+	// Env is added to the task container.
+	Env []v1.EnvVar `json:"env,omitempty"`
+	// Volumes are added to the task Pod.
+	Volumes []v1.Volume `json:"volumes,omitempty"`
+	// VolumeMounts are added to the task container.
+	VolumeMounts []v1.VolumeMount `json:"volumeMounts,omitempty"`
+	// ConcurrencyPolicy is the CronJob concurrency policy.
+	//+kubebuilder:validation:Enum=Allow;Forbid;Replace
+	ConcurrencyPolicy string `json:"concurrencyPolicy,omitempty"`
+	// SuccessfulJobsHistoryLimit is passed through to the CronJob.
+	//+kubebuilder:validation:Minimum=0
+	SuccessfulJobsHistoryLimit *int32 `json:"successfulJobsHistoryLimit,omitempty"`
+	// FailedJobsHistoryLimit is passed through to the CronJob.
+	//+kubebuilder:validation:Minimum=0
+	FailedJobsHistoryLimit *int32 `json:"failedJobsHistoryLimit,omitempty"`
 }
 
 type KubegresFailover struct {
@@ -74,8 +108,14 @@ type KubegresFailover struct {
 	OnPrimaryPodDrain bool `json:"onPrimaryPodDrain,omitempty"`
 }
 
+// KubegresPodDisruptionBudget controls the PodDisruptionBudget Kubegres
+// manages for the primary. It is also created when
+// spec.failover.onPrimaryPodDrain is true.
 type KubegresPodDisruptionBudget struct {
-	Enabled      bool   `json:"enabled,omitempty"`
+	// Enabled creates the PodDisruptionBudget even when drain failover is off.
+	Enabled bool `json:"enabled,omitempty"`
+	// MinAvailable is the PodDisruptionBudget minAvailable value.
+	//+kubebuilder:validation:Minimum=0
 	MinAvailable *int32 `json:"minAvailable,omitempty"`
 }
 
@@ -98,33 +138,40 @@ type Volume struct {
 type Probe struct {
 	LivenessProbe  *v1.Probe `json:"livenessProbe,omitempty"`
 	ReadinessProbe *v1.Probe `json:"readinessProbe,omitempty"`
-	StartupProbe   *v1.Probe `json:"startupProbe,omitempty"`
+	// StartupProbe replaces the startup probe Kubegres sets on the
+	// PostgreSQL container.
+	StartupProbe *v1.Probe `json:"startupProbe,omitempty"`
 }
 
+// Lifecycle overrides container lifecycle hooks on the PostgreSQL container.
 type Lifecycle struct {
+	// PreStop replaces the preStop hook Kubegres sets on the PostgreSQL
+	// container.
 	PreStop *v1.LifecycleHandler `json:"preStop,omitempty"`
 }
 
 type KubegresSpec struct {
-	Replicas                 *int32                      `json:"replicas,omitempty"`
-	Image                    string                      `json:"image,omitempty"`
-	Port                     int32                       `json:"port,omitempty"`
-	ImagePullSecrets         []v1.LocalObjectReference   `json:"imagePullSecrets,omitempty"`
-	CustomConfig             string                      `json:"customConfig,omitempty"`
-	Database                 KubegresDatabase            `json:"database,omitempty"`
-	Failover                 KubegresFailover            `json:"failover,omitempty"`
-	PodDisruptionBudget      KubegresPodDisruptionBudget `json:"podDisruptionBudget,omitempty"`
-	Backup                   KubegresBackUp              `json:"backup,omitempty"`
-	CronTasks                []KubegresCronTask          `json:"cronTasks,omitempty"`
-	Env                      []v1.EnvVar                 `json:"env,omitempty"`
-	Scheduler                KubegresScheduler           `json:"scheduler,omitempty"`
-	Resources                v1.ResourceRequirements     `json:"resources,omitempty"`
-	Volume                   Volume                      `json:"volume,omitempty"`
-	SecurityContext          *v1.PodSecurityContext      `json:"securityContext,omitempty"`
-	ContainerSecurityContext *v1.SecurityContext         `json:"containerSecurityContext,omitempty"`
-	Probe                    Probe                       `json:"probe,omitempty"`
-	Lifecycle                Lifecycle                   `json:"lifecycle,omitempty"`
-	ServiceAccountName       string                      `json:"serviceAccountName,omitempty"`
+	Replicas            *int32                      `json:"replicas,omitempty"`
+	Image               string                      `json:"image,omitempty"`
+	Port                int32                       `json:"port,omitempty"`
+	ImagePullSecrets    []v1.LocalObjectReference   `json:"imagePullSecrets,omitempty"`
+	CustomConfig        string                      `json:"customConfig,omitempty"`
+	Database            KubegresDatabase            `json:"database,omitempty"`
+	Failover            KubegresFailover            `json:"failover,omitempty"`
+	PodDisruptionBudget KubegresPodDisruptionBudget `json:"podDisruptionBudget,omitempty"`
+	Backup              KubegresBackUp              `json:"backup,omitempty"`
+	//+listType=map
+	//+listMapKey=name
+	CronTasks                []KubegresCronTask      `json:"cronTasks,omitempty"`
+	Env                      []v1.EnvVar             `json:"env,omitempty"`
+	Scheduler                KubegresScheduler       `json:"scheduler,omitempty"`
+	Resources                v1.ResourceRequirements `json:"resources,omitempty"`
+	Volume                   Volume                  `json:"volume,omitempty"`
+	SecurityContext          *v1.PodSecurityContext  `json:"securityContext,omitempty"`
+	ContainerSecurityContext *v1.SecurityContext     `json:"containerSecurityContext,omitempty"`
+	Probe                    Probe                   `json:"probe,omitempty"`
+	Lifecycle                Lifecycle               `json:"lifecycle,omitempty"`
+	ServiceAccountName       string                  `json:"serviceAccountName,omitempty"`
 }
 
 // ----------------------- STATUS -----------------------------------------
