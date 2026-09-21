@@ -21,6 +21,8 @@ startup probe (`spec.probe.startupProbe`) and the `preStop` hook
 
 See [`docs/primary-drain-failover.md`](docs/primary-drain-failover.md) for the opt-in `spec.failover.onPrimaryPodDrain` feature.
 
+See [`docs/pitr-archive.md`](docs/pitr-archive.md) for custom WAL archive and restore commands using the database Pod identity.
+
 **Features**
 
 * It can manage one or many clusters of Postgres instances.

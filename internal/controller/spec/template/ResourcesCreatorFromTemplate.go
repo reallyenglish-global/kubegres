@@ -106,6 +106,7 @@ func (r *ResourcesCreatorFromTemplate) CreatePrimaryStatefulSet(statefulSetInsta
 	primaryServiceName := r.kubegresContext.GetServiceResourceName(true)
 	r.initStatefulSet(primaryServiceName, &statefulSetTemplate, statefulSetInstanceIndex)
 	r.customConfigSpecHelper.ConfigureStatefulSet(&statefulSetTemplate)
+	r.configureArchive(&statefulSetTemplate)
 	return statefulSetTemplate, nil
 }
 
@@ -121,6 +122,7 @@ func (r *ResourcesCreatorFromTemplate) CreateReplicaStatefulSet(statefulSetInsta
 
 	r.initStatefulSet(replicaServiceName, &statefulSetTemplate, statefulSetInstanceIndex)
 	r.customConfigSpecHelper.ConfigureStatefulSet(&statefulSetTemplate)
+	r.configureArchive(&statefulSetTemplate)
 
 	initContainer := &statefulSetTemplate.Spec.Template.Spec.InitContainers[0]
 	postgresSpec := r.kubegresContext.Kubegres.Spec
@@ -303,6 +305,20 @@ func (r *ResourcesCreatorFromTemplate) initStatefulSet(
 
 	if postgresSpec.ServiceAccountName != "" {
 		statefulSetTemplate.Spec.Template.Spec.ServiceAccountName = postgresSpec.ServiceAccountName
+	}
+}
+
+func (r *ResourcesCreatorFromTemplate) configureArchive(statefulSet *apps.StatefulSet) {
+	backupSpec := r.kubegresContext.Kubegres.Spec.Backup
+	container := &statefulSet.Spec.Template.Spec.Containers[0]
+	if backupSpec.ArchiveCommand != "" {
+		container.Args = append(container.Args,
+			"-c", "archive_mode=on",
+			"-c", "archive_command="+backupSpec.ArchiveCommand,
+		)
+	}
+	if backupSpec.RestoreCommand != "" {
+		container.Args = append(container.Args, "-c", "restore_command="+backupSpec.RestoreCommand)
 	}
 }
 
