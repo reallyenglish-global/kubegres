@@ -141,10 +141,20 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	rm Dockerfile.cross
 
 .PHONY: build-installer
-build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
+build-installer: manifests generate kustomize ## Generate dist/install.yaml with CRDs and deployment for the image in IMG.
 	mkdir -p dist
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
+	git checkout -- config/manager/kustomization.yaml
+
+.PHONY: installer
+installer: manifests generate kustomize ## Regenerate the committed kubegres.yaml from config/ (image pinned in config/manager/kustomization.yaml).
+	$(KUSTOMIZE) build config/default > kubegres.yaml
+
+.PHONY: verify-generated
+verify-generated: installer ## Fail if generated CRDs, deepcopy, kubegres.yaml, or go.mod/go.sum are stale.
+	go mod tidy
+	git diff --exit-code -- api config kubegres.yaml go.mod go.sum
 
 ##@ Deployment
 
@@ -165,13 +175,13 @@ LATEST ?= controller:latest
 .PHONY: deploy-check
 deploy-check:
 ifeq ($(IMG),$(LATEST))
-	@echo "PLEASE PROVIDE THE ARGUMENT 'IMG' WHEN RUNNING 'make deploy'. EXAMPLE OF USAGE: 'make deploy IMG=reactivetechio/kubegres:1.19'"
+	@echo "PLEASE PROVIDE THE ARGUMENT 'IMG' WHEN RUNNING 'make deploy'. EXAMPLE OF USAGE: 'make deploy IMG=ghcr.io/reallyenglish-global/kubegres:v1.21'"
 	exit 1
 endif
 	@echo "RUNNING THE ACCEPTANCE TESTS AND THEN WILL DEPLOY $(IMG) INTO DOCKER HUB."
 
-## Usage: 'make deploy IMG=reactivetechio/kubegres:[version]'
-## eg: 'make deploy IMG=reactivetechio/kubegres:1.19'
+## Usage: 'make deploy IMG=ghcr.io/reallyenglish-global/kubegres:[version]'
+## eg: 'make deploy IMG=ghcr.io/reallyenglish-global/kubegres:v1.21'
 ## Run acceptance tests then deploy into Docker Hub the controller as the Docker image provided in arg ${IMG}
 ## and update the local file "kubegres.yaml" with the image ${IMG}
 .PHONY: deploy
@@ -199,7 +209,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.5.0
+KUSTOMIZE_VERSION ?= v5.8.1
 CONTROLLER_TOOLS_VERSION ?= v0.21.0
 ENVTEST_VERSION ?= release-0.24
 GOLANGCI_LINT_VERSION ?= v1.61.0
