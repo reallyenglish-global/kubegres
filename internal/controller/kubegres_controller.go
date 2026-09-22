@@ -130,10 +130,12 @@ func (r *KubegresReconciler) returnn(result ctrl.Result,
 
 func (r *KubegresReconciler) getDeployedKubegresResource(ctx context.Context, req ctrl.Request) (*kubegresv1.Kubegres, error) {
 
-	// The reconcile request is enqueued from the informer after the cache has
-	// stored the event, so the cached read below already sees the change that
-	// triggered this reconcile. A conflicting status write is retried by the
-	// workqueue, which is cheaper than delaying every reconcile.
+	// Status updates can enqueue a reconcile before the informer cache has
+	// observed the latest object. Keep the short settling delay used by the
+	// original controller so a follow-up reconcile does not act on stale
+	// status/spec state and strand a blocking operation.
+	time.Sleep(1 * time.Second)
+
 	kubegres := &kubegresv1.Kubegres{}
 	err := r.Client.Get(ctx, req.NamespacedName, kubegres)
 	if err == nil {
