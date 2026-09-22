@@ -59,3 +59,20 @@ spec:
     size: 20Gi
     volumeMount: /var/backups/postgres
 ```
+
+## Backup time zone
+
+Set `spec.backup.timeZone` to an IANA time zone (for example
+`America/New_York`) to interpret `schedule` in that zone, passed through to
+the CronJob's `spec.timeZone`. When unset, the Kubernetes CronJob controller
+default (UTC) applies. Changing `timeZone` on an existing Kubegres deletes and
+re-creates the backup CronJob so the change takes effect.
+
+```yaml
+spec:
+  backup:
+    schedule: "0 2 * * *"
+    timeZone: America/New_York
+    size: 20Gi
+    volumeMount: /var/backups/postgres
+```

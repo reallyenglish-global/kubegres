@@ -195,6 +195,19 @@ func (r *BackUpCronJobCountSpecEnforcer) hasSpecChanged() (hasSpecChanged bool) 
 		r.logSpecChange("spec.backup.customConfig")
 	}
 
+	currentTimeZone := ""
+	if cronJobSpec.TimeZone != nil {
+		currentTimeZone = *cronJobSpec.TimeZone
+	}
+	expectedTimeZone := ""
+	if kubegresBackUpSpec.TimeZone != nil {
+		expectedTimeZone = *kubegresBackUpSpec.TimeZone
+	}
+	if currentTimeZone != expectedTimeZone {
+		hasSpecChanged = true
+		r.logSpecChange("spec.backup.timeZone")
+	}
+
 	return hasSpecChanged
 }
 

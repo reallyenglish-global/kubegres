@@ -151,6 +151,7 @@ func (r *ResourcesCreatorFromTemplate) CreateBackUpCronJob(configMapNameForBackU
 	backUpCronJob.OwnerReferences = r.getOwnerReference()
 
 	backUpCronJob.Spec.Schedule = backupSpec.Schedule
+	backUpCronJob.Spec.TimeZone = backupSpec.TimeZone
 
 	backUpCronJob.Spec.JobTemplate.Spec.Template.Annotations = r.getCustomAnnotations()
 

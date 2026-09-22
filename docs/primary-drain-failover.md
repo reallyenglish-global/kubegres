@@ -47,6 +47,39 @@ Kubegres creates one owner-managed PDB selecting both `primary` and `replica` Po
 
 The sequence is: move/restart the replica and wait for it to become Ready and streaming; allow drain of the primary; promote the verified replica; then let Kubegres reconstruct the former primary as a replica. The old primary must not remain writable during promotion.
 
+## Unhealthy pod eviction policy
+
+Set `spec.podDisruptionBudget.unhealthyPodEvictionPolicy` to `AlwaysAllow` or
+`IfHealthyBudget`. This maps directly to the PodDisruptionBudget's
+`spec.unhealthyPodEvictionPolicy` field. Leaving it unset does not change
+existing behavior; the Kubernetes API server default (`IfHealthyBudget`)
+applies.
+
+By default (`IfHealthyBudget`), Kubernetes will not evict a Pod that is
+already unhealthy while the PDB's disruption budget is exhausted. If the
+primary itself is unhealthy at the moment a node drain reaches it, the
+eviction can stall indefinitely and drain-aware failover never gets a chance
+to run, because promotion is triggered by the `DisruptionTarget` condition
+that an eviction attempt sets on the Pod.
+
+```yaml
+spec:
+  replicas: 2
+  failover:
+    onPrimaryPodDrain: true
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+    unhealthyPodEvictionPolicy: AlwaysAllow
+```
+
+`AlwaysAllow` lets the drain evict an already-unhealthy primary regardless of
+the disruption budget, so the eviction proceeds, the `DisruptionTarget`
+condition is set, and drain-aware failover can promote the Ready replica.
+Only set this when `onPrimaryPodDrain` failover is enabled and a Ready
+replica is expected to be available; otherwise an unhealthy primary could be
+evicted with no safe promotion target.
+
 ## Rollback
 
 Set `onPrimaryPodDrain: false` to disable the automatic trigger. Existing manual promotion through `failover.promotePod` and existing crash failover behavior remain unchanged.

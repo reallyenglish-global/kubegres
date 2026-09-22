@@ -42,6 +42,7 @@ spec:
       concurrencyPolicy: Forbid
       successfulJobsHistoryLimit: 3
       failedJobsHistoryLimit: 1
+      timeZone: America/New_York
 ```
 
 ## Environment and storage
@@ -60,6 +61,10 @@ spec:
 - `concurrencyPolicy` may be `Allow`, `Forbid`, or `Replace`. Omit it to use
   the Kubernetes CronJob default. `Forbid` is recommended for backups and
   maintenance that must not overlap.
+- `timeZone` is the IANA time zone (for example `America/New_York`) the
+  `schedule` is interpreted in, passed through to the CronJob's
+  `spec.timeZone`. Omit it to use the Kubernetes CronJob controller default
+  (UTC). Changing `timeZone` updates the existing CronJob in place.
 
 ### Examples
 
