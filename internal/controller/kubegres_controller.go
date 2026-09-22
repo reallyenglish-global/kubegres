@@ -22,18 +22,23 @@ package controller
 
 import (
 	"context"
-	"github.com/go-logr/logr"
-	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
-	ctx2 "reactive-tech.io/kubegres/internal/controller/ctx"
-	"reactive-tech.io/kubegres/internal/controller/ctx/resources"
 	"time"
 
+	"github.com/go-logr/logr"
+	apps "k8s.io/api/apps/v1"
+	batch "k8s.io/api/batch/v1"
+	core "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	kubegresv1 "reactive-tech.io/kubegres/api/v1"
+	ctx2 "reactive-tech.io/kubegres/internal/controller/ctx"
+	"reactive-tech.io/kubegres/internal/controller/ctx/resources"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 // KubegresReconciler reconciles a Kubegres object
@@ -42,6 +47,10 @@ type KubegresReconciler struct {
 	Logger   logr.Logger
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+	// MaxConcurrentReconciles bounds how many Kubegres objects reconcile in
+	// parallel. Each Kubegres is independent, so values above 1 remove
+	// head-of-line blocking between clusters. Zero means the default of 1.
+	MaxConcurrentReconciles int
 }
 
 //+kubebuilder:rbac:groups=kubegres.reactive-tech.io,resources=kubegres,verbs=get;list;watch;create;update;patch;delete
@@ -66,7 +75,7 @@ type KubegresReconciler struct {
 // the user.
 //
 // For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.0/pkg/reconcile
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.24.0/pkg/reconcile
 func (r *KubegresReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	//_ = r.Logger.WithValues("kubegres", req.NamespacedName)
 
@@ -121,10 +130,10 @@ func (r *KubegresReconciler) returnn(result ctrl.Result,
 
 func (r *KubegresReconciler) getDeployedKubegresResource(ctx context.Context, req ctrl.Request) (*kubegresv1.Kubegres, error) {
 
-	// We sleep 1 second to let sufficient time to Kubernetes to update its system
-	// so that when we will call the Get method below, we will receive the latest Kubegres resource
-	time.Sleep(1 * time.Second)
-
+	// The reconcile request is enqueued from the informer after the cache has
+	// stored the event, so the cached read below already sees the change that
+	// triggered this reconcile. A conflicting status write is retried by the
+	// workqueue, which is cheaper than delaying every reconcile.
 	kubegres := &kubegresv1.Kubegres{}
 	err := r.Client.Get(ctx, req.NamespacedName, kubegres)
 	if err == nil {
@@ -162,11 +171,20 @@ func (r *KubegresReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
+	// StatefulSets, Services, CronJobs and the PodDisruptionBudget carry a
+	// Kubegres controller reference, so Owns() enqueues on their events. Pods
+	// and PVCs are created by the StatefulSet controller and only carry the
+	// app label, so they are mapped explicitly and filtered to the changes the
+	// reconciler acts on (disruption, readiness, deletion, resize).
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kubegresv1.Kubegres{}).
 		Named(ctx2.KindKubegres).
+		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
 		Owns(&apps.StatefulSet{}).
-		Owns(&core.PersistentVolumeClaim{}).
 		Owns(&core.Service{}).
+		Owns(&batch.CronJob{}).
+		Owns(&policy.PodDisruptionBudget{}).
+		Watches(&core.Pod{}, handler.EnqueueRequestsFromMapFunc(mapKubegresChildByAppLabel), builder.WithPredicates(podChangePredicate())).
+		Watches(&core.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(mapKubegresChildByAppLabel), builder.WithPredicates(pvcChangePredicate())).
 		Complete(r)
 }

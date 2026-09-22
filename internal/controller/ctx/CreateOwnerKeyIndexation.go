@@ -87,23 +87,5 @@ func CreateOwnerKeyIndexation(mgr ctrl.Manager,
 		return err
 	}
 
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &core.Pod{}, DeploymentOwnerKey, func(rawObj client.Object) []string {
-		// grab the Pod object, extract the owner...
-		depl := rawObj.(*core.Pod)
-		owner := metav1.GetControllerOf(depl)
-		if owner == nil {
-			return nil
-		}
-		// ...make sure it's a Kubegres...
-		if owner.APIVersion != postgresV1.GroupVersion.String() || owner.Kind != KindKubegres {
-			return nil
-		}
-
-		// ...and if so, return it
-		return []string{owner.Name}
-	}); err != nil {
-		return err
-	}
-
 	return nil
 }
