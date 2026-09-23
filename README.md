@@ -24,6 +24,8 @@ kubectl apply -f https://github.com/reallyenglish-global/kubegres/releases/downl
 
 The operator image is published at `ghcr.io/reallyenglish-global/kubegres`.
 
+For Helm users, the repository includes a chart at [`charts/kubegres`](charts/kubegres/README.md). It installs the operator, RBAC, metrics service, and CRD; see the chart README for CRD lifecycle guidance.
+
 ## Compatibility
 
 | | |
