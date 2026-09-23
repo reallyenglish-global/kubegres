@@ -101,3 +101,16 @@ jobs:
       - name: Delete Kind cluster (cleanup)
         if: always()
         run: kind delete cluster --name kubegres
+
+  helm:
+    name: Lint Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.11.1
+      - name: Lint chart
+        run: helm lint charts/kubegres
+      - name: Render chart including CRDs
+        run: helm template kubegres charts/kubegres --namespace kubegres-system --include-crds
