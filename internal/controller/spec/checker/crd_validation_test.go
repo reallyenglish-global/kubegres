@@ -93,3 +93,54 @@ func TestCRDDeclaresBackupSizeAsQuantity(t *testing.T) {
 		t.Error("backup.size has no quantity pattern")
 	}
 }
+
+// The Kubegres CRD had no additionalPrinterColumns, unlike MaintenanceOperation
+// in the same API group, so `kubectl get kubegres` showed only NAME and AGE.
+// This proves the generated CRD surfaces the fields operators need at a glance.
+func TestCRDDeclaresKubegresPrinterColumns(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "..", "config", "crd", "bases", "kubegres.reactive-tech.io_kubegres.yaml")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var crd map[string]any
+	if err := yaml.Unmarshal(raw, &crd); err != nil {
+		t.Fatal(err)
+	}
+	version := crd["spec"].(map[string]any)["versions"].([]any)[0].(map[string]any)
+	columns := asSlice(version["additionalPrinterColumns"])
+	if len(columns) == 0 {
+		t.Fatal("kubegres CRD has no additionalPrinterColumns")
+	}
+
+	want := map[string]struct {
+		jsonPath string
+		colType  string
+	}{
+		"Replicas":  {".spec.replicas", "integer"},
+		"Image":     {".spec.image", "string"},
+		"Operation": {".status.blockingOperation.operationId", "string"},
+		"Step":      {".status.blockingOperation.stepId", "string"},
+		"Age":       {".metadata.creationTimestamp", "date"},
+	}
+
+	got := map[string]map[string]any{}
+	for _, c := range columns {
+		column := c.(map[string]any)
+		got[column["name"].(string)] = column
+	}
+
+	for name, expected := range want {
+		column, ok := got[name]
+		if !ok {
+			t.Errorf("printer column %q not found", name)
+			continue
+		}
+		if column["jsonPath"] != expected.jsonPath {
+			t.Errorf("printer column %q jsonPath = %v, want %v", name, column["jsonPath"], expected.jsonPath)
+		}
+		if column["type"] != expected.colType {
+			t.Errorf("printer column %q type = %v, want %v", name, column["type"], expected.colType)
+		}
+	}
+}

@@ -16,8 +16,13 @@ import (
 const (
 	cronTaskManagedByLabel = "kubegres.reactive-tech.io/cron-task"
 	cronTaskNameLabel      = "kubegres.reactive-tech.io/cron-task-name"
-	cronTaskContainerName  = "kubegres-task"
-	cronTaskScriptVolume   = "kubegres-task-script"
+	// cronTaskOwnerLabel identifies the Kubegres a cron task CronJob belongs
+	// to. It scopes EnforceSpec's CronJob listing so a reconcile only fetches
+	// this Kubegres's own cron task CronJobs instead of every CronJob in the
+	// namespace.
+	cronTaskOwnerLabel    = "kubegres.reactive-tech.io/name"
+	cronTaskContainerName = "kubegres-task"
+	cronTaskScriptVolume  = "kubegres-task-script"
 )
 
 // CronTasksCountSpecEnforcer reconciles the independent CronJobs declared in
@@ -37,7 +42,9 @@ func (r *CronTasksCountSpecEnforcer) EnforceSpec() error {
 	}
 
 	var deployed batch.CronJobList
-	if err := r.kubegresContext.Client.List(r.kubegresContext.Ctx, &deployed, client.InNamespace(r.kubegresContext.Kubegres.Namespace)); err != nil {
+	if err := r.kubegresContext.Client.List(r.kubegresContext.Ctx, &deployed,
+		client.InNamespace(r.kubegresContext.Kubegres.Namespace),
+		client.MatchingLabels{cronTaskOwnerLabel: r.kubegresContext.Kubegres.Name}); err != nil {
 		return err
 	}
 	for i := range deployed.Items {
@@ -113,6 +120,7 @@ func (r *CronTasksCountSpecEnforcer) newCronJob(task postgresV1.KubegresCronTask
 			Labels: map[string]string{
 				cronTaskManagedByLabel: "true",
 				cronTaskNameLabel:      task.Name,
+				cronTaskOwnerLabel:     postgres.Name,
 			},
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(postgres, postgresV1.GroupVersion.WithKind(ctx.KindKubegres))},
 		},
@@ -129,6 +137,7 @@ func (r *CronTasksCountSpecEnforcer) newCronJob(task postgresV1.KubegresCronTask
 	}
 	cronJob.Spec.SuccessfulJobsHistoryLimit = task.SuccessfulJobsHistoryLimit
 	cronJob.Spec.FailedJobsHistoryLimit = task.FailedJobsHistoryLimit
+	cronJob.Spec.TimeZone = task.TimeZone
 	return cronJob
 }
 

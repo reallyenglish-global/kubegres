@@ -14,7 +14,23 @@ spec:
     singular: kubegres
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.replicas
+      name: Replicas
+      type: integer
+    - jsonPath: .spec.image
+      name: Image
+      type: string
+    - jsonPath: .status.blockingOperation.operationId
+      name: Operation
+      type: string
+    - jsonPath: .status.blockingOperation.stepId
+      name: Step
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: Kubegres is the Schema for the kubegres API
@@ -59,6 +75,12 @@ spec:
                       empty or names a PVC that does not exist. The ephemeral PVC is deleted
                       with the Pod, so backup scripts must copy data to durable storage.
                     pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
+                    type: string
+                  timeZone:
+                    description: |-
+                      TimeZone is the IANA time zone (for example "America/New_York") passed
+                      to the CronJob's spec.timeZone. When unset, the CronJob controller
+                      default applies.
                     type: string
                   volumeMount:
                     type: string
@@ -487,6 +509,12 @@ spec:
                       format: int32
                       minimum: 0
                       type: integer
+                    timeZone:
+                      description: |-
+                        TimeZone is the IANA time zone (for example "America/New_York") passed
+                        to the CronJob's spec.timeZone. When unset, the CronJob controller
+                        default applies.
+                      type: string
                     volumeMounts:
                       description: VolumeMounts are added to the task container.
                       items:
@@ -2798,6 +2826,15 @@ spec:
                     format: int32
                     minimum: 0
                     type: integer
+                  unhealthyPodEvictionPolicy:
+                    description: |-
+                      UnhealthyPodEvictionPolicy is the PodDisruptionBudget unhealthyPodEvictionPolicy value.
+                      AlwaysAllow lets a drain evict an already-unhealthy primary so drain-aware
+                      failover can proceed. When unset, the Kubernetes API server default applies.
+                    enum:
+                    - IfHealthyBudget
+                    - AlwaysAllow
+                    type: string
                 type: object
               port:
                 format: int32

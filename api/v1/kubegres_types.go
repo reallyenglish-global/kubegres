@@ -43,6 +43,10 @@ type KubegresBackUp struct {
 	// Image is the container image used by the backup CronJob. When empty,
 	// the database image is used for backwards compatibility.
 	Image string `json:"image,omitempty"`
+	// TimeZone is the IANA time zone (for example "America/New_York") passed
+	// to the CronJob's spec.timeZone. When unset, the CronJob controller
+	// default applies.
+	TimeZone *string `json:"timeZone,omitempty"`
 }
 
 // KubegresCronTaskScript mounts one ConfigMap key as a file in a CronTask container.
@@ -100,6 +104,10 @@ type KubegresCronTask struct {
 	// FailedJobsHistoryLimit is passed through to the CronJob.
 	//+kubebuilder:validation:Minimum=0
 	FailedJobsHistoryLimit *int32 `json:"failedJobsHistoryLimit,omitempty"`
+	// TimeZone is the IANA time zone (for example "America/New_York") passed
+	// to the CronJob's spec.timeZone. When unset, the CronJob controller
+	// default applies.
+	TimeZone *string `json:"timeZone,omitempty"`
 }
 
 type KubegresFailover struct {
@@ -119,6 +127,11 @@ type KubegresPodDisruptionBudget struct {
 	// MinAvailable is the PodDisruptionBudget minAvailable value.
 	//+kubebuilder:validation:Minimum=0
 	MinAvailable *int32 `json:"minAvailable,omitempty"`
+	// UnhealthyPodEvictionPolicy is the PodDisruptionBudget unhealthyPodEvictionPolicy value.
+	// AlwaysAllow lets a drain evict an already-unhealthy primary so drain-aware
+	// failover can proceed. When unset, the Kubernetes API server default applies.
+	//+kubebuilder:validation:Enum=IfHealthyBudget;AlwaysAllow
+	UnhealthyPodEvictionPolicy *string `json:"unhealthyPodEvictionPolicy,omitempty"`
 }
 
 type KubegresScheduler struct {
@@ -209,6 +222,11 @@ type KubegresStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicas"
+//+kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image"
+//+kubebuilder:printcolumn:name="Operation",type="string",JSONPath=".status.blockingOperation.operationId"
+//+kubebuilder:printcolumn:name="Step",type="string",JSONPath=".status.blockingOperation.stepId"
+//+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Kubegres is the Schema for the kubegres API
 type Kubegres struct {

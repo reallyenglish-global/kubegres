@@ -34,6 +34,7 @@ import (
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func newPdbTestKubegres(name string) *postgresV1.Kubegres {
@@ -167,6 +168,75 @@ func TestEnsurePodDisruptionBudget_ExplicitMinAvailable_IsPropagated(t *testing.
 	}
 }
 
+// Proves that the created PDB's owner reference is a controller reference
+// (Controller=true), which controller-runtime's Owns() requires to enqueue
+// reconciles for changes to owned PodDisruptionBudgets.
+func TestEnsurePodDisruptionBudget_Enabled_OwnerReferenceIsController(t *testing.T) {
+	kubegres := newPdbTestKubegres("database")
+	kubegres.Spec.PodDisruptionBudget.Enabled = true
+	enforcer, kubeClient := newPdbTestEnforcer(t, kubegres)
+
+	if err := enforcer.ensurePodDisruptionBudget(); err != nil {
+		t.Fatal(err)
+	}
+
+	pdb, err := getPdb(t, kubeClient, "database")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pdb.OwnerReferences) != 1 {
+		t.Fatalf("expected exactly one owner reference, got %#v", pdb.OwnerReferences)
+	}
+	owner := pdb.OwnerReferences[0]
+	if owner.Controller == nil || !*owner.Controller {
+		t.Fatalf("expected owner reference Controller=true, got %#v", owner)
+	}
+	if owner.BlockOwnerDeletion == nil || !*owner.BlockOwnerDeletion {
+		t.Fatalf("expected owner reference BlockOwnerDeletion=true, got %#v", owner)
+	}
+}
+
+// Proves that spec.podDisruptionBudget.unhealthyPodEvictionPolicy is propagated
+// to the PDB when set, and left unset (nil, so the API server default applies)
+// otherwise.
+func TestEnsurePodDisruptionBudget_UnhealthyPodEvictionPolicy_IsPropagated(t *testing.T) {
+	kubegres := newPdbTestKubegres("database")
+	kubegres.Spec.PodDisruptionBudget.Enabled = true
+	policyValue := "AlwaysAllow"
+	kubegres.Spec.PodDisruptionBudget.UnhealthyPodEvictionPolicy = &policyValue
+	enforcer, kubeClient := newPdbTestEnforcer(t, kubegres)
+
+	if err := enforcer.ensurePodDisruptionBudget(); err != nil {
+		t.Fatal(err)
+	}
+
+	pdb, err := getPdb(t, kubeClient, "database")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pdb.Spec.UnhealthyPodEvictionPolicy == nil || *pdb.Spec.UnhealthyPodEvictionPolicy != policy.AlwaysAllow {
+		t.Fatalf("expected unhealthyPodEvictionPolicy AlwaysAllow, got %#v", pdb.Spec.UnhealthyPodEvictionPolicy)
+	}
+}
+
+func TestEnsurePodDisruptionBudget_UnhealthyPodEvictionPolicyUnset_LeavesDefaultBehaviourUnchanged(t *testing.T) {
+	kubegres := newPdbTestKubegres("database")
+	kubegres.Spec.PodDisruptionBudget.Enabled = true
+	enforcer, kubeClient := newPdbTestEnforcer(t, kubegres)
+
+	if err := enforcer.ensurePodDisruptionBudget(); err != nil {
+		t.Fatal(err)
+	}
+
+	pdb, err := getPdb(t, kubeClient, "database")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pdb.Spec.UnhealthyPodEvictionPolicy != nil {
+		t.Fatalf("expected unhealthyPodEvictionPolicy to remain unset, got %#v", pdb.Spec.UnhealthyPodEvictionPolicy)
+	}
+}
+
 // Proves that an existing PDB with a spec that has drifted from the desired state
 // (wrong minAvailable and selector) is updated to match the desired spec, in place.
 func TestEnsurePodDisruptionBudget_ExistingPdbWithDriftedSpec_IsUpdated(t *testing.T) {
@@ -200,5 +270,83 @@ func TestEnsurePodDisruptionBudget_ExistingPdbWithDriftedSpec_IsUpdated(t *testi
 	}
 	if pdb.Spec.Selector == nil || pdb.Spec.Selector.MatchLabels["app"] != "database" {
 		t.Fatalf("expected drifted selector to be corrected to app=database, got %#v", pdb.Spec.Selector)
+	}
+}
+
+// Proves that reconciling an unchanged PDB spec performs zero Update calls,
+// so a reconcile loop does not repeatedly write an unchanged PDB.
+func TestEnsurePodDisruptionBudget_UnchangedSpec_PerformsNoUpdate(t *testing.T) {
+	kubegres := newPdbTestKubegres("database")
+	kubegres.Spec.PodDisruptionBudget.Enabled = true
+	explicitMin := int32(2)
+	kubegres.Spec.PodDisruptionBudget.MinAvailable = &explicitMin
+
+	scheme := runtime.NewScheme()
+	if err := policy.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	updateCount := 0
+	kubeClient := fake.NewClientBuilder().WithScheme(scheme).WithInterceptorFuncs(interceptor.Funcs{
+		Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+			updateCount++
+			return c.Update(ctx, obj, opts...)
+		},
+	}).Build()
+	enforcer := ServicesCountSpecEnforcer{
+		kubegresContext: ctx.KubegresContext{Ctx: context.Background(), Client: kubeClient, Kubegres: kubegres},
+	}
+
+	if err := enforcer.ensurePodDisruptionBudget(); err != nil {
+		t.Fatal(err)
+	}
+	if err := enforcer.ensurePodDisruptionBudget(); err != nil {
+		t.Fatal(err)
+	}
+
+	if updateCount != 0 {
+		t.Fatalf("expected zero Update calls for an unchanged PDB spec, got %d", updateCount)
+	}
+}
+
+// Proves that an existing PDB whose owner reference is not a controller
+// reference (for example, created before this field was set) is repaired to
+// Controller=true so controller-runtime's Owns() enqueues reconciles for it.
+func TestEnsurePodDisruptionBudget_ExistingPdbWithNonControllerOwnerRef_IsRepaired(t *testing.T) {
+	kubegres := newPdbTestKubegres("database")
+	kubegres.Spec.PodDisruptionBudget.Enabled = true
+	enforcer, kubeClient := newPdbTestEnforcer(t, kubegres)
+
+	existing := &policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "database", Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: postgresV1.GroupVersion.String(), Kind: "Kubegres", Name: "database", UID: kubegres.UID,
+				// Controller intentionally left nil/false, simulating a PDB created
+				// before owner references were set with NewControllerRef.
+			}},
+		},
+		Spec: policy.PodDisruptionBudgetSpec{
+			MinAvailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"app": "database"}},
+		},
+	}
+	if err := kubeClient.Create(context.Background(), existing); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := enforcer.ensurePodDisruptionBudget(); err != nil {
+		t.Fatal(err)
+	}
+
+	pdb, err := getPdb(t, kubeClient, "database")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pdb.OwnerReferences) != 1 {
+		t.Fatalf("expected exactly one owner reference, got %#v", pdb.OwnerReferences)
+	}
+	owner := pdb.OwnerReferences[0]
+	if owner.Controller == nil || !*owner.Controller {
+		t.Fatalf("expected owner reference to be repaired to Controller=true, got %#v", owner)
 	}
 }

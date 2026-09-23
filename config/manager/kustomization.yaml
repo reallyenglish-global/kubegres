@@ -4,5 +4,5 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: reactivetechio/kubegres
-  newTag: "1.19"
+  newName: ghcr.io/reallyenglish-global/kubegres
+  newTag: v1.22

@@ -50,6 +50,39 @@ func TestCreateBackUpCronJobUsesEphemeralVolume(t *testing.T) {
 	}
 }
 
+// Proves that spec.backup.timeZone is wired through to the backup CronJob's
+// spec.timeZone so the backup runs in the requested IANA time zone.
+func TestCreateBackUpCronJobSetsTimeZone(t *testing.T) {
+	replicas := int32(1)
+	timeZone := "America/New_York"
+	kubegres := &kubegresv1.Kubegres{
+		ObjectMeta: metav1.ObjectMeta{Name: "postgres", Namespace: "default"},
+		Spec: kubegresv1.KubegresSpec{
+			Replicas: &replicas,
+			Image:    "postgres:17",
+			Backup: kubegresv1.KubegresBackUp{
+				Schedule:    "0 1 * * *",
+				VolumeMount: "/backup",
+				Size:        "20Gi",
+				TimeZone:    &timeZone,
+			},
+		},
+	}
+	creator := CreateResourcesCreatorFromTemplate(ctx.KubegresContext{
+		Kubegres: kubegres,
+		Ctx:      context.Background(),
+	}, CustomConfigSpecHelper{}, ResourceTemplateLoader{})
+
+	cronJob, err := creator.CreateBackUpCronJob("base-kubegres-config", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cronJob.Spec.TimeZone == nil || *cronJob.Spec.TimeZone != timeZone {
+		t.Fatalf("expected CronJob spec.timeZone %q, got %#v", timeZone, cronJob.Spec.TimeZone)
+	}
+}
+
 func TestCreateBackUpCronJobUsesConfiguredPVC(t *testing.T) {
 	replicas := int32(1)
 	kubegres := &kubegresv1.Kubegres{

@@ -23,6 +23,7 @@ package resources_count_spec
 import (
 	core "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -95,15 +96,52 @@ func (r *ServicesCountSpecEnforcer) ensurePodDisruptionBudget() error {
 	if kubegres.Spec.PodDisruptionBudget.MinAvailable != nil {
 		minAvailable = *kubegres.Spec.PodDisruptionBudget.MinAvailable
 	}
+	var unhealthyPodEvictionPolicy *policy.UnhealthyPodEvictionPolicyType
+	if kubegres.Spec.PodDisruptionBudget.UnhealthyPodEvictionPolicy != nil {
+		v := policy.UnhealthyPodEvictionPolicyType(*kubegres.Spec.PodDisruptionBudget.UnhealthyPodEvictionPolicy)
+		unhealthyPodEvictionPolicy = &v
+	}
+	ownerRef := metav1.NewControllerRef(kubegres, postgresV1.GroupVersion.WithKind(ctx.KindKubegres))
 	desired := &policy.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: kubegres.Namespace, OwnerReferences: []metav1.OwnerReference{{APIVersion: postgresV1.GroupVersion.String(), Kind: "Kubegres", Name: kubegres.Name, UID: kubegres.UID}}},
-		Spec:       policy.PodDisruptionBudgetSpec{MinAvailable: func() *intstr.IntOrString { v := intstr.FromInt(int(minAvailable)); return &v }(), Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": kubegres.Name}}},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: kubegres.Namespace, OwnerReferences: []metav1.OwnerReference{*ownerRef}},
+		Spec: policy.PodDisruptionBudgetSpec{
+			MinAvailable:               func() *intstr.IntOrString { v := intstr.FromInt(int(minAvailable)); return &v }(),
+			Selector:                   &metav1.LabelSelector{MatchLabels: map[string]string{"app": kubegres.Name}},
+			UnhealthyPodEvictionPolicy: unhealthyPodEvictionPolicy,
+		},
 	}
 	if apierrors.IsNotFound(err) {
 		return r.kubegresContext.Client.Create(r.kubegresContext.Ctx, desired)
 	}
+
+	specUnchanged := apiequality.Semantic.DeepEqual(current.Spec.MinAvailable, desired.Spec.MinAvailable) &&
+		apiequality.Semantic.DeepEqual(current.Spec.Selector, desired.Spec.Selector) &&
+		apiequality.Semantic.DeepEqual(current.Spec.UnhealthyPodEvictionPolicy, desired.Spec.UnhealthyPodEvictionPolicy)
+	ownerRefUnchanged := isControllerOwnerRefSet(current.OwnerReferences, *ownerRef)
+	if specUnchanged && ownerRefUnchanged {
+		return nil
+	}
+
 	current.Spec = desired.Spec
+	if !ownerRefUnchanged {
+		current.OwnerReferences = desired.OwnerReferences
+	}
 	return r.kubegresContext.Client.Update(r.kubegresContext.Ctx, current)
+}
+
+// isControllerOwnerRefSet reports whether owners already contains want as a
+// controller reference (Controller=true, BlockOwnerDeletion=true). It is used
+// to repair PodDisruptionBudgets created before owner references were set
+// with metav1.NewControllerRef, since controller-runtime's Owns() only
+// enqueues reconciles for controller references.
+func isControllerOwnerRefSet(owners []metav1.OwnerReference, want metav1.OwnerReference) bool {
+	for _, owner := range owners {
+		if owner.UID != want.UID || owner.APIVersion != want.APIVersion || owner.Kind != want.Kind || owner.Name != want.Name {
+			continue
+		}
+		return owner.Controller != nil && *owner.Controller && owner.BlockOwnerDeletion != nil && *owner.BlockOwnerDeletion
+	}
+	return false
 }
 
 func (r *ServicesCountSpecEnforcer) isPrimaryServiceDeployed() bool {

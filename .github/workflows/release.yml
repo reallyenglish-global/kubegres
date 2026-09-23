@@ -11,7 +11,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -30,7 +30,7 @@ jobs:
         run: |
           tag="${EVENT_TAG:-$INPUT_TAG}"
           if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.]+)?$'; then
-            echo "tag must be a version tag such as v1.21: $tag" >&2
+            echo "tag must be a version tag such as v1.22: $tag" >&2
             exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -57,6 +57,7 @@ jobs:
           images: ${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ steps.release.outputs.tag }}
+            type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.event.release.prerelease != true }}
 
       - name: Build and publish image
@@ -69,3 +70,16 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           provenance: mode=max
           sbom: true
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build install manifest for the released image
+        run: make build-installer IMG=${{ env.IMAGE_NAME }}:${{ steps.release.outputs.tag }}
+
+      - name: Attach install manifest to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ steps.release.outputs.tag }}" dist/install.yaml --clobber
