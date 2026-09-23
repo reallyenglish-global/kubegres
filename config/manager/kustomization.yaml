@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: ghcr.io/reallyenglish-global/kubegres
-  newTag: v1.21
+  newTag: v1.22

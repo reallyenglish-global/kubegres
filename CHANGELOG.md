@@ -4,10 +4,10 @@ All notable changes to `reallyenglish-global/kubegres` are documented here. The 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This fork was taken from `reactive-tech/kubegres`
 at upstream tag `v1.18`; entries below start from that point.
 
-## Unreleased
+## [v1.22] - 2026-09-23
 
-Merged to `main` since the `v1.21` tag, plus the pending work on the `fix/post-upgrade-hardening` branch. Scope may
-still change before release.
+This release contains the changes merged to `main` since `v1.21`, including the post-upgrade hardening and
+event-driven watch work from pull request #26.
 
 ### Added
 
@@ -31,6 +31,8 @@ still change before release.
 ### Fixed
 
 - Closed fork test-coverage gaps and fixed ephemeral backup PVC validation (#25).
+- Restored informer-cache settling during reconciliation so resource creation and status transitions do not stall
+  while the cache catches up (#26).
 
 ## [v1.21] - 2026-09-19
 
@@ -69,5 +71,6 @@ built from `git log`.
 - Updated the README for the fork.
 
 [v1.21]: https://github.com/reallyenglish-global/kubegres/releases/tag/v1.21
+[v1.22]: https://github.com/reallyenglish-global/kubegres/releases/tag/v1.22
 [v1.20]: https://github.com/reallyenglish-global/kubegres/releases/tag/v1.20
 [v1.19]: https://github.com/reallyenglish-global/kubegres/releases/tag/v1.19

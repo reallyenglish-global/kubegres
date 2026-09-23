@@ -19,7 +19,7 @@ kubectl apply -f https://raw.githubusercontent.com/reallyenglish-global/kubegres
 Or pin to a release by applying its `install.yaml` asset from the [Releases page](https://github.com/reallyenglish-global/kubegres/releases), for example:
 
 ```
-kubectl apply -f https://github.com/reallyenglish-global/kubegres/releases/download/v1.21/install.yaml
+kubectl apply -f https://github.com/reallyenglish-global/kubegres/releases/download/v1.22/install.yaml
 ```
 
 The operator image is published at `ghcr.io/reallyenglish-global/kubegres`.
