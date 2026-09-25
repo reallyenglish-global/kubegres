@@ -43,6 +43,7 @@ Install the fork as described above. For the `kind: Kubegres` resource fields, u
 * [`docs/cron-tasks.md`](docs/cron-tasks.md): independent `spec.cronTasks` CronJobs used for scheduled database maintenance. The feature is separate from, and does not change, `spec.backup`.
 * [`docs/backup-storage.md`](docs/backup-storage.md): using an existing backup PVC or temporary generic ephemeral storage for backup Pods.
 * [`docs/container-overrides.md`](docs/container-overrides.md): replacing the startup probe (`spec.probe.startupProbe`) and the `preStop` hook (`spec.lifecycle.preStop`) on the PostgreSQL container.
+* [`docs/resources.md`](docs/resources.md): common and role-specific primary/replica CPU and memory requests and limits.
 * [`docs/primary-drain-failover.md`](docs/primary-drain-failover.md): the opt-in `spec.failover.onPrimaryPodDrain` feature and the managed PodDisruptionBudget.
 * [`docs/pitr-archive.md`](docs/pitr-archive.md): custom WAL archive and restore commands using the database Pod identity.
 * [`docs/postgres-minor-upgrades.md`](docs/postgres-minor-upgrades.md): how a `spec.image` minor-version tag change is rolled out as a coordinated upgrade.
