@@ -24,6 +24,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	postgresV1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 )
 
@@ -42,7 +43,7 @@ func (r *ResourcesSpecEnforcer) GetSpecName() string {
 func (r *ResourcesSpecEnforcer) CheckForSpecDifference(statefulSet *apps.StatefulSet) StatefulSetSpecDifference {
 
 	current := statefulSet.Spec.Template.Spec.Containers[0].Resources
-	expected := r.kubegresContext.Kubegres.Spec.Resources
+	expected := resourcesForStatefulSet(r.kubegresContext.Kubegres.Spec, statefulSet)
 
 	if !r.compareResources(current, expected) {
 		return StatefulSetSpecDifference{
@@ -56,8 +57,19 @@ func (r *ResourcesSpecEnforcer) CheckForSpecDifference(statefulSet *apps.Statefu
 }
 
 func (r *ResourcesSpecEnforcer) EnforceSpec(statefulSet *apps.StatefulSet) (wasSpecUpdated bool, err error) {
-	statefulSet.Spec.Template.Spec.Containers[0].Resources = r.kubegresContext.Kubegres.Spec.Resources
+	statefulSet.Spec.Template.Spec.Containers[0].Resources = resourcesForStatefulSet(r.kubegresContext.Kubegres.Spec, statefulSet)
 	return true, nil
+}
+
+func resourcesForStatefulSet(spec postgresV1.KubegresSpec, statefulSet *apps.StatefulSet) v1.ResourceRequirements {
+	switch statefulSet.Labels["replicationRole"] {
+	case "primary":
+		return spec.ResourcesForPrimary()
+	case "replica":
+		return spec.ResourcesForReplica()
+	default:
+		return spec.Resources
+	}
 }
 
 func (r *ResourcesSpecEnforcer) OnSpecEnforcedSuccessfully(statefulSet *apps.StatefulSet) error {

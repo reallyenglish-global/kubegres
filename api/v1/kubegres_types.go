@@ -139,6 +139,12 @@ type KubegresScheduler struct {
 	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 }
 
+// KubegresRoleSpec contains configuration that applies to one PostgreSQL role.
+// An empty role-specific resources value falls back to KubegresSpec.Resources.
+type KubegresRoleSpec struct {
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+}
+
 type VolumeClaimTemplate struct {
 	Name string                       `json:"name,omitempty"`
 	Spec v1.PersistentVolumeClaimSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
@@ -181,12 +187,32 @@ type KubegresSpec struct {
 	Env                      []v1.EnvVar             `json:"env,omitempty"`
 	Scheduler                KubegresScheduler       `json:"scheduler,omitempty"`
 	Resources                v1.ResourceRequirements `json:"resources,omitempty"`
+	Primary                  KubegresRoleSpec        `json:"primary,omitempty"`
+	Replica                  KubegresRoleSpec        `json:"replica,omitempty"`
 	Volume                   Volume                  `json:"volume,omitempty"`
 	SecurityContext          *v1.PodSecurityContext  `json:"securityContext,omitempty"`
 	ContainerSecurityContext *v1.SecurityContext     `json:"containerSecurityContext,omitempty"`
 	Probe                    Probe                   `json:"probe,omitempty"`
 	Lifecycle                Lifecycle               `json:"lifecycle,omitempty"`
 	ServiceAccountName       string                  `json:"serviceAccountName,omitempty"`
+}
+
+// ResourcesForPrimary returns the primary-specific requirements when set, or
+// the backwards-compatible common requirements otherwise.
+func (s KubegresSpec) ResourcesForPrimary() v1.ResourceRequirements {
+	if s.Primary.Resources.Requests != nil || s.Primary.Resources.Limits != nil {
+		return s.Primary.Resources
+	}
+	return s.Resources
+}
+
+// ResourcesForReplica returns the replica-specific requirements when set, or
+// the backwards-compatible common requirements otherwise.
+func (s KubegresSpec) ResourcesForReplica() v1.ResourceRequirements {
+	if s.Replica.Resources.Requests != nil || s.Replica.Resources.Limits != nil {
+		return s.Replica.Resources
+	}
+	return s.Resources
 }
 
 // ----------------------- STATUS -----------------------------------------
