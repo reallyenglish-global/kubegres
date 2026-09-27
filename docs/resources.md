@@ -28,5 +28,6 @@ role. If a role-specific value is not set, Kubegres keeps the existing behavior
 and uses `spec.resources` for that role. This makes it possible to introduce
 role-specific sizing without changing existing manifests.
 
-Because a replica may be promoted during failover, ensure that its configured
-resources are sufficient for the workload it may serve after promotion.
+During failover, Kubegres recreates the promoted Pod with the primary resource
+requirements in the same update as the promotion. Ensure the cluster has enough
+capacity to schedule the larger primary requests when a replica is promoted.

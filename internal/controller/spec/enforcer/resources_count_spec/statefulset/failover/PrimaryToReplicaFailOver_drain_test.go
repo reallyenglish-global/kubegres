@@ -3,15 +3,24 @@ package failover
 import (
 	"context"
 	"errors"
+	"reflect"
+	"testing"
+
 	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	v1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
+	"reactive-tech.io/kubegres/internal/controller/ctx/log"
+	"reactive-tech.io/kubegres/internal/controller/ctx/status"
+	operation2 "reactive-tech.io/kubegres/internal/controller/operation"
 	"reactive-tech.io/kubegres/internal/controller/states"
 	"reactive-tech.io/kubegres/internal/controller/states/statefulset"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"testing"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestIsVoluntaryDisruption(t *testing.T) {
@@ -109,5 +118,74 @@ func TestDeletePrimaryStatefulSetTreatsMissingPrimaryAsAlreadyDeleted(t *testing
 
 	if err := failover.deletePrimaryStatefulSet(); err != nil {
 		t.Fatalf("deletePrimaryStatefulSet() error = %v, want nil", err)
+	}
+}
+
+func TestPromoteReplicaToPrimaryAppliesPrimaryResources(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	kubegres := &v1.Kubegres{
+		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
+		Spec: v1.KubegresSpec{
+			Primary: v1.KubegresRoleSpec{Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("500m"),
+					core.ResourceMemory: resource.MustParse("4Gi"),
+				},
+				Limits: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("1"),
+					core.ResourceMemory: resource.MustParse("8Gi"),
+				},
+			}},
+			Replica: v1.KubegresRoleSpec{Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("100m"),
+					core.ResourceMemory: resource.MustParse("512Mi"),
+				},
+				Limits: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("250m"),
+					core.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			}},
+		},
+	}
+	statefulSet := appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "pg-1", Namespace: "default", Labels: map[string]string{"replicationRole": "replica"}},
+		Spec: appsv1.StatefulSetSpec{Template: core.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"replicationRole": "replica"}},
+			Spec:       core.PodSpec{Containers: []core.Container{{Name: "postgres", Resources: kubegres.Spec.ResourcesForReplica()}}},
+		}},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(&statefulSet).Build()
+	kubegresContext := ctx.KubegresContext{
+		Kubegres: kubegres,
+		Ctx:      context.Background(),
+		Client:   fakeClient,
+		Log:      log.LogWrapper{Kubegres: kubegres, Recorder: record.NewFakeRecorder(10)},
+		Status:   &status.KubegresStatusWrapper{Kubegres: kubegres},
+	}
+	blockingOperation := operation2.CreateBlockingOperation(kubegresContext)
+	failover := CreatePrimaryToReplicaFailOver(kubegresContext, states.ResourcesStates{}, blockingOperation)
+	blockingOperation.AddConfig(failover.CreateOperationConfigForFailingOver())
+
+	if err := failover.promoteReplicaToPrimaryFor(
+		statefulset.StatefulSetWrapper{InstanceIndex: 1, StatefulSet: statefulSet},
+		operation2.OperationIdPrimaryDbCountSpecEnforcement,
+		operation2.OperationStepIdPrimaryDbFailingOver,
+	); err != nil {
+		t.Fatalf("promoteReplicaToPrimaryFor() error = %v", err)
+	}
+
+	var promoted appsv1.StatefulSet
+	if err := fakeClient.Get(context.Background(), client.ObjectKey{Name: "pg-1", Namespace: "default"}, &promoted); err != nil {
+		t.Fatalf("failed to read promoted StatefulSet: %v", err)
+	}
+	got := promoted.Spec.Template.Spec.Containers[0].Resources
+	want := kubegres.Spec.ResourcesForPrimary()
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("promoted resources = %#v, want primary resources %#v", got, want)
 	}
 }
