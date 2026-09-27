@@ -6,6 +6,8 @@ stateful-set's life-cycle and data replication could be with Kubernetes.
 
 This is `reallyenglish-global/kubegres`, a fork of [reactive-tech/kubegres](https://github.com/reactive-tech/kubegres) taken at upstream tag `v1.18`. It exists because the fork needed newer Kubernetes and `sigs.k8s.io/controller-runtime` support than upstream tracked at the time, and a set of operational features upstream does not have: preStop and startupProbe overrides, failover on primary Pod drain with a managed PodDisruptionBudget, drain-aware replica-first failover, custom backup images, coordinated PostgreSQL minor image upgrades, independent scheduled cron tasks, automatic database PVC expansion, ephemeral backup PVCs, and WAL archive/restore commands.
 
+See [`docs/postgres-major-upgrades.md`](docs/postgres-major-upgrades.md) for the explicit, user-controlled `MajorUpgrade` workflow. Major-version image changes are never applied as a normal StatefulSet rollout.
+
 See [CHANGELOG.md](CHANGELOG.md) for release history. If you are moving from `reactive-tech/kubegres` v1.18, read [`docs/upgrading-from-upstream.md`](docs/upgrading-from-upstream.md) first.
 
 ## Install

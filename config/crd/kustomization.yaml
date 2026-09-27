@@ -4,6 +4,7 @@
 resources:
 - bases/kubegres.reactive-tech.io_kubegres.yaml
 - bases/kubegres.reactive-tech.io_maintenanceoperations.yaml
+- bases/kubegres.reactive-tech.io_majorupgrades.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

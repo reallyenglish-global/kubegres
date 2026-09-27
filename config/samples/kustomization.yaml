@@ -2,4 +2,5 @@
 resources:
 - kubegres_v1_kubegres.yaml
 - kubegres_v1_maintenanceoperation.yaml
+- kubegres_v1_majorupgrade.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

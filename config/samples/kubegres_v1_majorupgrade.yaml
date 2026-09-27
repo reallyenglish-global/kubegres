@@ -1,0 +1,45 @@
+apiVersion: kubegres.reactive-tech.io/v1
+kind: MajorUpgrade
+metadata:
+  name: app-postgres-15-to-16
+spec:
+  sourceKubegres: app
+  sourceImage: postgres:15.8
+  targetImage: postgres:16.4
+  strategy: logical-replication
+  # These hooks are intentionally deployment-owned. Kubegres records and gates
+  # the workflow; it does not guess credentials, DDL, or application cutover.
+  preflight:
+    image: ghcr.io/example/postgres-upgrade-tools:1
+    script:
+      configMapName: postgres-upgrade-scripts
+      key: preflight.sh
+      mountPath: /scripts/preflight.sh
+  bootstrap:
+    image: ghcr.io/example/postgres-upgrade-tools:1
+    script:
+      configMapName: postgres-upgrade-scripts
+      key: bootstrap.sh
+      mountPath: /scripts/bootstrap.sh
+  copy:
+    image: ghcr.io/example/postgres-upgrade-tools:1
+    script:
+      configMapName: postgres-upgrade-scripts
+      key: copy.sh
+      mountPath: /scripts/copy.sh
+  validate:
+    image: ghcr.io/example/postgres-upgrade-tools:1
+    script:
+      configMapName: postgres-upgrade-scripts
+      key: validate.sh
+      mountPath: /scripts/validate.sh
+  cutover:
+    image: ghcr.io/example/postgres-upgrade-tools:1
+    script:
+      configMapName: postgres-upgrade-scripts
+      key: cutover.sh
+      mountPath: /scripts/cutover.sh
+  cleanup:
+    image: ghcr.io/example/postgres-upgrade-tools:1
+    command: ["/bin/sh", "-c"]
+    args: ["echo retain source until explicitly approved"]
