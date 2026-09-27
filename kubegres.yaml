@@ -3312,6 +3312,10 @@ spec:
               replicas:
                 format: int32
                 type: integer
+              terminationGracePeriodSeconds:
+                format: int64
+                minimum: 0
+                type: integer
               resources:
                 description: ResourceRequirements describes the compute resource requirements.
                 properties:

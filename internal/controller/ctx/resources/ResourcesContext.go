@@ -173,6 +173,7 @@ func addStatefulSetSpecEnforcers(rc *ResourcesContext) {
 	livenessProbeSpecEnforcer := statefulset_spec2.CreateLivenessProbeSpecEnforcer(rc.KubegresContext)
 	readinessProbeSpecEnforcer := statefulset_spec2.CreateReadinessProbeSpecEnforcer(rc.KubegresContext)
 	preStopSpecEnforcer := statefulset_spec2.CreatePreStopSpecEnforcer(rc.KubegresContext)
+	terminationGracePeriodSecondsSpecEnforcer := statefulset_spec2.CreateTerminationGracePeriodSecondsSpecEnforcer(rc.KubegresContext)
 	serviAccountNameSpecEnforcer := statefulset_spec2.CreateServiceAccountNameSpecEnforcer(rc.KubegresContext)
 	startupProbeSpecEnforcer := statefulset_spec.CreateStartupProbeSpecEnforcer(rc.KubegresContext)
 
@@ -190,6 +191,7 @@ func addStatefulSetSpecEnforcers(rc *ResourcesContext) {
 	rc.StatefulSetsSpecsEnforcer.AddSpecEnforcer(&livenessProbeSpecEnforcer)
 	rc.StatefulSetsSpecsEnforcer.AddSpecEnforcer(&readinessProbeSpecEnforcer)
 	rc.StatefulSetsSpecsEnforcer.AddSpecEnforcer(&preStopSpecEnforcer)
+	rc.StatefulSetsSpecsEnforcer.AddSpecEnforcer(&terminationGracePeriodSecondsSpecEnforcer)
 	rc.StatefulSetsSpecsEnforcer.AddSpecEnforcer(&serviAccountNameSpecEnforcer)
 	rc.StatefulSetsSpecsEnforcer.AddSpecEnforcer(&startupProbeSpecEnforcer)
 
