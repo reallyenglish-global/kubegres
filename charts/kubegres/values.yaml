@@ -1,0 +1,45 @@
+# The CRD is installed from charts/kubegres/crds and is intentionally not
+# upgraded or deleted by Helm. Review CRD changes separately before upgrading.
+image:
+  repository: ghcr.io/reallyenglish-global/kubegres
+  tag: v1.22
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+leaderElection:
+  enabled: true
+
+metrics:
+  enabled: true
+  secure: true
+  service:
+    type: ClusterIP
+    port: 8443
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+nameOverride: ""
+fullnameOverride: ""
