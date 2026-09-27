@@ -113,4 +113,4 @@ jobs:
       - name: Lint chart
         run: helm lint charts/kubegres
       - name: Render chart including CRDs
-        run: helm template kubegres charts/kubegres --namespace kubegres-system --include-crds
+        run: helm template kubegres charts/kubegres --namespace kubegres-system --kube-version 1.27.0 --include-crds
