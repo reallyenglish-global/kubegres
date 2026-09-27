@@ -463,7 +463,7 @@ spec:
                 command:
                 - sh
                 - -c
-                - sleep 5 && pg_ctl -D $PGDATA stop -m smart
+                - sleep 5 && pg_ctl -D $PGDATA -w -t 2 stop -m smart || pg_ctl -D $PGDATA -w stop -m fast
 `
 ReplicaServiceTemplate = `apiVersion: v1
 kind: Service
@@ -622,6 +622,6 @@ spec:
                 command:
                 - sh
                 - -c
-                - sleep 5 && pg_ctl -D $PGDATA stop -m smart
+                - sleep 5 && pg_ctl -D $PGDATA -w -t 2 stop -m smart || pg_ctl -D $PGDATA -w stop -m fast
 `
 )
