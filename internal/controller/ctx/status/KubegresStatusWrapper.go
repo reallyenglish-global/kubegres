@@ -42,6 +42,15 @@ func (r *KubegresStatusWrapper) SetEnforcedReplicas(value int32) {
 	r.Kubegres.Status.EnforcedReplicas = value
 }
 
+func (r *KubegresStatusWrapper) SetBootstrapIdentity(state, attempt, pvcName string) {
+	r.addStatusFieldToUpdate("BootstrapState", state)
+	r.addStatusFieldToUpdate("BootstrapAttempt", attempt)
+	r.addStatusFieldToUpdate("BootstrapPVCName", pvcName)
+	r.Kubegres.Status.BootstrapState = state
+	r.Kubegres.Status.BootstrapAttempt = attempt
+	r.Kubegres.Status.BootstrapPVCName = pvcName
+}
+
 func (r *KubegresStatusWrapper) GetPreviousBlockingOperation() v1.KubegresBlockingOperation {
 	return r.Kubegres.Status.PreviousBlockingOperation
 }

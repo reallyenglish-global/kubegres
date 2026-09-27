@@ -1,0 +1,48 @@
+apiVersion: kubegres.reactive-tech.io/v1
+kind: Kubegres
+metadata:
+  name: kubegres-bootstrap-sample
+spec:
+  replicas: 1
+  image: postgres:17.2
+  containerSecurityContext:
+    runAsUser: 999
+    runAsGroup: 999
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  database:
+    size: 20Gi
+  env:
+    - name: POSTGRES_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: destination-postgres
+          key: password
+    - name: POSTGRES_REPLICATION_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: destination-replication
+          key: password
+  bootstrap:
+    logical:
+      source:
+        host: source-db.example.internal
+        port: 5432
+        database: application
+        username: migration_reader
+        passwordSecretKeyRef:
+          name: external-source
+          key: password
+        tls:
+          caSecretKeyRef:
+            name: external-source-ca
+            key: ca.crt
+      database: application
+      timeoutSeconds: 3600
