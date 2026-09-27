@@ -4569,6 +4569,10 @@ spec:
                 type: object
               serviceAccountName:
                 type: string
+              terminationGracePeriodSeconds:
+                format: int64
+                minimum: 0
+                type: integer
               volume:
                 properties:
                   volumeClaimTemplates:

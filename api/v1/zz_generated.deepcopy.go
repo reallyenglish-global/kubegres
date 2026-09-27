@@ -298,6 +298,11 @@ func (in *KubegresSpec) DeepCopyInto(out *KubegresSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.TerminationGracePeriodSeconds != nil {
+		in, out := &in.TerminationGracePeriodSeconds, &out.TerminationGracePeriodSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	if in.ImagePullSecrets != nil {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
 		*out = make([]corev1.LocalObjectReference, len(*in))
