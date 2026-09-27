@@ -22,6 +22,7 @@ package statefulset
 
 import (
 	"errors"
+	"fmt"
 	v1 "k8s.io/api/core/v1"
 	postgresV1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
@@ -72,6 +73,9 @@ func (r *PrimaryDbCountSpecEnforcer) Enforce() error {
 	// Backward compatibility logic where we initialize the field 'EnforcedReplicas'
 	// added in Kubegres' status from version 1.8
 	r.initialiseStatusEnforcedReplicas()
+	if r.kubegresContext.Kubegres.Spec.Bootstrap != nil && r.isPrimaryDbReady() && r.kubegresContext.Kubegres.Status.BootstrapState != "completed" {
+		r.kubegresContext.Status.SetBootstrapIdentity("completed", r.kubegresContext.Kubegres.Status.BootstrapAttempt, r.kubegresContext.Kubegres.Status.BootstrapPVCName)
+	}
 
 	if r.blockingOperation.IsActiveOperationIdDifferentOf(operation2.OperationIdPrimaryDbCountSpecEnforcement) {
 		return nil
@@ -118,6 +122,14 @@ func (r *PrimaryDbCountSpecEnforcer) logKubegresFeaturesAreReEnabled() {
 }
 
 func (r *PrimaryDbCountSpecEnforcer) shouldWeDeployNewPrimaryDb() bool {
+	// Bootstrap is create-time-only. Never recreate a primary after the initial
+	// deployment has been recorded; doing so could import a new snapshot into a
+	// replacement PVC after data loss.
+	if r.kubegresContext.Kubegres.Spec.Bootstrap != nil && r.kubegresContext.Kubegres.Status.BootstrapState == "completed" {
+		// A completed import is never repeated. Recovery from missing storage is
+		// intentionally fail-closed and requires an explicit operator decision.
+		return false
+	}
 
 	shouldWeDeployNewPrimary := !r.resourcesStates.StatefulSets.Primary.IsDeployed &&
 		r.resourcesStates.StatefulSets.Replicas.NbreDeployed == 0
@@ -160,6 +172,10 @@ func (r *PrimaryDbCountSpecEnforcer) deployNewPrimaryStatefulSet() error {
 		return err
 	}
 
+	if r.kubegresContext.Kubegres.Spec.Bootstrap != nil && r.kubegresContext.Kubegres.Status.BootstrapState == "" {
+		pvcName := "postgres-db-" + r.kubegresContext.Kubegres.Name + "-" + strconv.Itoa(int(instanceIndex)) + "-0"
+		r.kubegresContext.Status.SetBootstrapIdentity("reserved", fmt.Sprintf("%s/%d", r.kubegresContext.Kubegres.UID, instanceIndex), pvcName)
+	}
 	if err = r.kubegresContext.Client.Create(r.kubegresContext.Ctx, &primaryStatefulSet); err != nil {
 		r.kubegresContext.Log.ErrorEvent("PrimaryStatefulSetDeploymentErr", err, "Unable to deploy Primary StatefulSet.", "Primary name", primaryStatefulSet.Name)
 		r.blockingOperation.RemoveActiveOperation()

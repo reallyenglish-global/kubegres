@@ -53,6 +53,11 @@ func (r *SpecChecker) CheckSpec() (SpecCheckResult, error) {
 	specCheckResult := SpecCheckResult{}
 
 	spec := &r.kubegresContext.Kubegres.Spec
+	if errMsg := r.bootstrapSpecError(spec); errMsg != "" {
+		specCheckResult.HasSpecFatalError = true
+		specCheckResult.FatalErrorMessage = r.logSpecErrMsg(errMsg)
+		return specCheckResult, nil
+	}
 	if errMsg := r.validateCronTasks(spec.CronTasks); errMsg != "" {
 		specCheckResult.HasSpecFatalError = true
 		specCheckResult.FatalErrorMessage = r.logSpecErrMsg(errMsg)

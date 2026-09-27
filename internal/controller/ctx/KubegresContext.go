@@ -46,6 +46,7 @@ const (
 	DatabaseVolumeName                     = "postgres-db"
 	BaseConfigMapVolumeName                = "base-config"
 	CustomConfigMapVolumeName              = "custom-config"
+	BootstrapCAVolumeName                  = "kubegres-bootstrap-ca"
 	BaseConfigMapName                      = "base-kubegres-config"
 	CronJobNamePrefix                      = "backup-"
 	DefaultContainerPortNumber             = 5432
@@ -72,5 +73,6 @@ func (r *KubegresContext) IsReservedVolumeName(volumeName string) bool {
 	return volumeName == DatabaseVolumeName ||
 		volumeName == BaseConfigMapVolumeName ||
 		volumeName == CustomConfigMapVolumeName ||
+		volumeName == BootstrapCAVolumeName ||
 		strings.Contains(volumeName, "kube-api")
 }

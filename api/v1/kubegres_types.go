@@ -187,6 +187,38 @@ type KubegresSpec struct {
 	Probe                    Probe                   `json:"probe,omitempty"`
 	Lifecycle                Lifecycle               `json:"lifecycle,omitempty"`
 	ServiceAccountName       string                  `json:"serviceAccountName,omitempty"`
+	// Bootstrap is a create-time-only logical import from one trusted PostgreSQL database.
+	Bootstrap *KubegresBootstrap `json:"bootstrap,omitempty"`
+}
+
+type KubegresBootstrap struct {
+	// Logical is the only supported bootstrap method in this API.
+	// The import runs once, before the primary PostgreSQL container starts.
+	Logical *KubegresLogicalBootstrap `json:"logical,omitempty"`
+}
+
+type KubegresLogicalBootstrap struct {
+	Source   KubegresBootstrapSource `json:"source"`
+	Database string                  `json:"database"`
+	// TimeoutSeconds is the maximum duration of each external PostgreSQL
+	// command. It must be between 60 seconds and 24 hours.
+	// +kubebuilder:validation:Minimum=60
+	// +kubebuilder:validation:Maximum=86400
+	// +kubebuilder:default=3600
+	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
+}
+
+type KubegresBootstrapSource struct {
+	Host                 string               `json:"host"`
+	Port                 int32                `json:"port,omitempty"`
+	Database             string               `json:"database"`
+	Username             string               `json:"username"`
+	PasswordSecretKeyRef v1.SecretKeySelector `json:"passwordSecretKeyRef"`
+	TLS                  KubegresBootstrapTLS `json:"tls"`
+}
+
+type KubegresBootstrapTLS struct {
+	CASecretKeyRef v1.SecretKeySelector `json:"caSecretKeyRef"`
 }
 
 // ----------------------- STATUS -----------------------------------------
@@ -216,6 +248,10 @@ type KubegresStatus struct {
 	BlockingOperation         KubegresBlockingOperation `json:"blockingOperation,omitempty"`
 	PreviousBlockingOperation KubegresBlockingOperation `json:"previousBlockingOperation,omitempty"`
 	EnforcedReplicas          int32                     `json:"enforcedReplicas,omitempty"`
+	// BootstrapState is reserved or completed and is never cleared automatically.
+	BootstrapState   string `json:"bootstrapState,omitempty"`
+	BootstrapAttempt string `json:"bootstrapAttempt,omitempty"`
+	BootstrapPVCName string `json:"bootstrapPVCName,omitempty"`
 }
 
 // ----------------------- RESOURCE ---------------------------------------
@@ -233,6 +269,7 @@ type Kubegres struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	//+kubebuilder:validation:XValidation:rule="has(self.bootstrap) == has(oldSelf.bootstrap) && (!has(self.bootstrap) || self.bootstrap == oldSelf.bootstrap)",message="bootstrap is immutable and cannot be added, removed, or changed after creation"
 	Spec   KubegresSpec   `json:"spec,omitempty"`
 	Status KubegresStatus `json:"status,omitempty"`
 }

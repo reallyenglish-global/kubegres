@@ -105,6 +105,9 @@ func (r *ResourcesCreatorFromTemplate) CreatePrimaryStatefulSet(statefulSetInsta
 
 	primaryServiceName := r.kubegresContext.GetServiceResourceName(true)
 	r.initStatefulSet(primaryServiceName, &statefulSetTemplate, statefulSetInstanceIndex)
+	if err := configureLogicalBootstrap(r.kubegresContext.Kubegres, &statefulSetTemplate.Spec.Template.Spec); err != nil {
+		return apps.StatefulSet{}, err
+	}
 	r.customConfigSpecHelper.ConfigureStatefulSet(&statefulSetTemplate)
 	r.configureArchive(&statefulSetTemplate)
 	return statefulSetTemplate, nil

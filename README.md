@@ -48,6 +48,7 @@ Install the fork as described above. For the `kind: Kubegres` resource fields, u
 * [`docs/postgres-minor-upgrades.md`](docs/postgres-minor-upgrades.md): how a `spec.image` minor-version tag change is rolled out as a coordinated upgrade.
 * [`docs/pod-loss-classification-and-safe-node-maintenance.md`](docs/pod-loss-classification-and-safe-node-maintenance.md): design for classifying why a database Pod was lost and running safe planned node maintenance.
 * [`docs/handoff-maintenance-operation-v1.md`](docs/handoff-maintenance-operation-v1.md): implementation handoff for the `MaintenanceOperation` CRD contract (schema only, no reconciler yet).
+* [`docs/bootstrap-external-database.md`](docs/bootstrap-external-database.md): the bounded, one-time logical import from a trusted external PostgreSQL database. This is not full lifecycle migration support.
 * [`docs/upgrading-from-upstream.md`](docs/upgrading-from-upstream.md): moving an existing `reactive-tech/kubegres` v1.18 install to this fork.
 
 **Features**
