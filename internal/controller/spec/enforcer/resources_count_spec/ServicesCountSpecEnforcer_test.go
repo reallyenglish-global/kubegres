@@ -119,8 +119,12 @@ func TestEnsurePodDisruptionBudget_Enabled_CreatesPdbWithDefaults(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pdb.Spec.Selector == nil || pdb.Spec.Selector.MatchLabels["app"] != "database" {
+	if pdb.Spec.Selector == nil || len(pdb.Spec.Selector.MatchLabels) != 1 || len(pdb.Spec.Selector.MatchExpressions) != 0 ||
+		pdb.Spec.Selector.MatchLabels["app"] != "database" {
 		t.Fatalf("expected selector to match app=database, got %#v", pdb.Spec.Selector)
+	}
+	if _, ok := pdb.Spec.Selector.MatchLabels["replicationRole"]; ok {
+		t.Fatalf("expected PDB selector not to be scoped to a replication role, got %#v", pdb.Spec.Selector)
 	}
 	if pdb.Spec.MinAvailable == nil || pdb.Spec.MinAvailable.IntValue() != 1 {
 		t.Fatalf("expected default minAvailable of 1, got %#v", pdb.Spec.MinAvailable)
@@ -268,7 +272,8 @@ func TestEnsurePodDisruptionBudget_ExistingPdbWithDriftedSpec_IsUpdated(t *testi
 	if pdb.Spec.MinAvailable == nil || pdb.Spec.MinAvailable.IntValue() != 2 {
 		t.Fatalf("expected drifted minAvailable to be corrected to 2, got %#v", pdb.Spec.MinAvailable)
 	}
-	if pdb.Spec.Selector == nil || pdb.Spec.Selector.MatchLabels["app"] != "database" {
+	if pdb.Spec.Selector == nil || len(pdb.Spec.Selector.MatchLabels) != 1 || len(pdb.Spec.Selector.MatchExpressions) != 0 ||
+		pdb.Spec.Selector.MatchLabels["app"] != "database" {
 		t.Fatalf("expected drifted selector to be corrected to app=database, got %#v", pdb.Spec.Selector)
 	}
 }
