@@ -130,6 +130,11 @@ func (r *PrimaryDbCountSpecEnforcer) shouldWeDeployNewPrimaryDb() bool {
 		// intentionally fail-closed and requires an explicit operator decision.
 		return false
 	}
+	if r.kubegresContext.Kubegres.Spec.Bootstrap != nil && r.kubegresContext.Kubegres.Status.BootstrapState == "reserved" && r.getReservedBootstrapPvc().Name == "" {
+		// The initial StatefulSet create was accepted, but its exact PVC is now
+		// absent. Never allocate a new instance index and silently re-import.
+		return false
+	}
 
 	shouldWeDeployNewPrimary := !r.resourcesStates.StatefulSets.Primary.IsDeployed &&
 		r.resourcesStates.StatefulSets.Replicas.NbreDeployed == 0
@@ -172,11 +177,17 @@ func (r *PrimaryDbCountSpecEnforcer) deployNewPrimaryStatefulSet() error {
 		return err
 	}
 
-	if r.kubegresContext.Kubegres.Spec.Bootstrap != nil && r.kubegresContext.Kubegres.Status.BootstrapState == "" {
+	bootstrapReserved := r.kubegresContext.Kubegres.Spec.Bootstrap != nil && r.kubegresContext.Kubegres.Status.BootstrapState == ""
+	if bootstrapReserved {
 		pvcName := "postgres-db-" + r.kubegresContext.Kubegres.Name + "-" + strconv.Itoa(int(instanceIndex)) + "-0"
 		r.kubegresContext.Status.SetBootstrapIdentity("reserved", fmt.Sprintf("%s/%d", r.kubegresContext.Kubegres.UID, instanceIndex), pvcName)
 	}
 	if err = r.kubegresContext.Client.Create(r.kubegresContext.Ctx, &primaryStatefulSet); err != nil {
+		if bootstrapReserved {
+			// A rejected create is not an attempted bootstrap. Clear the in-memory
+			// reservation so a transient API error can be retried safely.
+			r.kubegresContext.Status.SetBootstrapIdentity("", "", "")
+		}
 		r.kubegresContext.Log.ErrorEvent("PrimaryStatefulSetDeploymentErr", err, "Unable to deploy Primary StatefulSet.", "Primary name", primaryStatefulSet.Name)
 		r.blockingOperation.RemoveActiveOperation()
 		return err
@@ -245,6 +256,17 @@ func (r *PrimaryDbCountSpecEnforcer) getLastDeployedPrimaryPvc() *v1.PersistentV
 	namespace := r.kubegresContext.Kubegres.Namespace
 	resourceKey := client.ObjectKey{Namespace: namespace, Name: resourceName}
 	pvc := &v1.PersistentVolumeClaim{}
+	_ = r.kubegresContext.Client.Get(r.kubegresContext.Ctx, resourceKey, pvc)
+	return pvc
+}
+
+func (r *PrimaryDbCountSpecEnforcer) getReservedBootstrapPvc() *v1.PersistentVolumeClaim {
+	pvc := &v1.PersistentVolumeClaim{}
+	pvcName := r.kubegresContext.Kubegres.Status.BootstrapPVCName
+	if pvcName == "" {
+		return pvc
+	}
+	resourceKey := client.ObjectKey{Namespace: r.kubegresContext.Kubegres.Namespace, Name: pvcName}
 	_ = r.kubegresContext.Client.Get(r.kubegresContext.Ctx, resourceKey, pvc)
 	return pvc
 }

@@ -17,7 +17,7 @@ const (
 	bootstrapCAFile            = "/var/run/kubegres-bootstrap/ca/ca.crt"
 )
 
-func configureLogicalBootstrap(kubegres *v1.Kubegres, statefulSetSpec *core.PodSpec) error {
+func configureLogicalBootstrap(kubegres *v1.Kubegres, statefulSetSpec *core.PodSpec, pvcName string) error {
 	if kubegres.Spec.Bootstrap == nil || kubegres.Spec.Bootstrap.Logical == nil {
 		return nil
 	}
@@ -47,7 +47,7 @@ func configureLogicalBootstrap(kubegres *v1.Kubegres, statefulSetSpec *core.PodS
 			{Name: "PGDATA", Value: kubegres.Spec.Database.VolumeMount + "/" + ctx.DefaultDatabaseFolder},
 			{Name: "POSTGRES_USER", Value: destinationUser},
 			{Name: "BOOTSTRAP_CR_UID", Value: string(kubegres.UID)},
-			{Name: "BOOTSTRAP_PVC_NAME", Value: ctx.DatabaseVolumeName},
+			{Name: "BOOTSTRAP_PVC_NAME", Value: pvcName},
 			{Name: "BOOTSTRAP_COMPLETED", Value: fmt.Sprintf("%t", kubegres.Status.BootstrapState == "completed")},
 			{Name: "BOOTSTRAP_SOURCE_PASSWORD", ValueFrom: &core.EnvVarSource{SecretKeyRef: optionalSecretKeySelector(source.PasswordSecretKeyRef)}},
 		},
@@ -80,7 +80,7 @@ func configureLogicalBootstrap(kubegres *v1.Kubegres, statefulSetSpec *core.PodS
 }
 
 func optionalSecretKeySelector(selector core.SecretKeySelector) *core.SecretKeySelector {
-	selector.Optional = nil
+	selector.Optional = boolPtr(true)
 	return &selector
 }
 

@@ -28,7 +28,7 @@ func TestConfigureLogicalBootstrapUsesMountedEmptyPGDATAAndRunsFirst(t *testing.
 	}}
 	pod := core.PodSpec{InitContainers: []core.Container{{Name: "existing-init"}}}
 
-	if err := configureLogicalBootstrap(kubegres, &pod); err != nil {
+	if err := configureLogicalBootstrap(kubegres, &pod, "postgres-db-example-1-0"); err != nil {
 		t.Fatal(err)
 	}
 	if got := pod.InitContainers[0].Name; got != bootstrapInitContainerName {
@@ -43,6 +43,13 @@ func TestConfigureLogicalBootstrapUsesMountedEmptyPGDATAAndRunsFirst(t *testing.
 	}
 	if got := envValue(bootstrap.Env, "BOOTSTRAP_SOURCE_PASSWORD").ValueFrom.SecretKeyRef.Name; got != "source" {
 		t.Fatalf("source secret = %q", got)
+	}
+	passwordSelector := envValue(bootstrap.Env, "BOOTSTRAP_SOURCE_PASSWORD").ValueFrom.SecretKeyRef
+	if passwordSelector.Optional == nil || !*passwordSelector.Optional {
+		t.Fatal("source password must be optional at Pod admission so marker-only restarts survive Secret deletion")
+	}
+	if got := envValue(bootstrap.Env, "BOOTSTRAP_PVC_NAME").Value; got != "postgres-db-example-1-0" {
+		t.Fatalf("PVC identity = %q", got)
 	}
 	if !strings.Contains(bootstrap.Command[2], "find \"$target\" -mindepth 1") || !strings.Contains(bootstrap.Command[2], "completion marker") {
 		t.Fatal("bootstrap script does not safely handle a mounted empty PGDATA")
