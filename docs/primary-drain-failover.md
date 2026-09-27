@@ -43,7 +43,7 @@ spec:
     minAvailable: 1
 ```
 
-Kubegres creates one owner-managed PDB selecting both `primary` and `replica` Pods. This permits one database Pod to be evicted while ensuring a second Pod remains available; separate PDBs per role would incorrectly block replica migration. `onPrimaryPodDrain` reacts only to the Kubernetes `DisruptionTarget` condition with eviction/preemption reasons. It does not react to arbitrary Pod deletions.
+Kubegres creates one owner-managed PDB selecting both `primary` and `replica` Pods. With two database Pods and `minAvailable: 1`, this permits one Pod to be evicted while ensuring a second Pod remains available. Scoping the selector to only the primary would leave zero disruptions allowed and prevent the eviction that triggers this failover path. `onPrimaryPodDrain` reacts only to the Kubernetes `DisruptionTarget` condition with eviction/preemption reasons. It does not react to arbitrary Pod deletions.
 
 The sequence is: move/restart the replica and wait for it to become Ready and streaming; allow drain of the primary; promote the verified replica; then let Kubegres reconstruct the former primary as a replica. The old primary must not remain writable during promotion.
 

@@ -62,10 +62,12 @@ var _ = Describe("Primary voluntary disruption failover", Label("core-failover",
 			if err != nil {
 				return false
 			}
-			if pdb.Spec.Selector == nil || pdb.Spec.Selector.MatchLabels["app"] != kubegres.Name {
+			if pdb.Spec.Selector == nil || len(pdb.Spec.Selector.MatchLabels) != 1 || len(pdb.Spec.Selector.MatchExpressions) != 0 ||
+				pdb.Spec.Selector.MatchLabels["app"] != kubegres.Name {
 				return false
 			}
-			return pdb.Spec.MinAvailable != nil && pdb.Spec.MinAvailable.IntValue() == 1
+			return pdb.Spec.MinAvailable != nil && pdb.Spec.MinAvailable.IntValue() == 1 &&
+				pdb.Status.ObservedGeneration == pdb.Generation && pdb.Status.DisruptionsAllowed >= 1
 		}, time.Minute, 5*time.Second).Should(BeTrue())
 
 		eviction := &policyv1beta1.Eviction{
@@ -75,8 +77,14 @@ var _ = Describe("Primary voluntary disruption failover", Label("core-failover",
 			},
 		}
 		log.Printf("Evicting primary Pod %q", primaryPodName)
-		Expect(k8sClientsetTest.CoreV1().Pods(resourceConfigs2.DefaultNamespace).
-			Evict(context.Background(), eviction)).To(Succeed())
+		Eventually(func() error {
+			err := k8sClientsetTest.CoreV1().Pods(resourceConfigs2.DefaultNamespace).
+				Evict(context.Background(), eviction)
+			if err != nil && !apierrors.IsTooManyRequests(err) {
+				return StopTrying("primary Pod eviction failed with a non-retryable error").Wrap(err)
+			}
+			return err
+		}, time.Minute, 2*time.Second).Should(Succeed())
 
 		Eventually(func() bool {
 			resources, err := resourceRetriever.GetKubegresResources()
