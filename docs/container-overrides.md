@@ -21,6 +21,18 @@ spec:
       failureThreshold: 60
 ```
 
+## Graceful shutdown
+
+By default, Kubegres marks the Pod terminating, waits five seconds for Service
+endpoint removal to propagate, and then asks PostgreSQL to stop in `smart` mode.
+That mode stops new work without forcibly disconnecting existing clients. Set
+`spec.terminationGracePeriodSeconds` high enough for the longest expected
+transaction or session drain; the default remains 10 seconds for compatibility.
+
+The five-second drain is part of the built-in hook. Replacing
+`spec.lifecycle.preStop` replaces that protection, so custom hooks must provide
+their own endpoint-drain delay and orderly PostgreSQL shutdown.
+
 ## PreStop hook
 
 `spec.lifecycle.preStop` is a standard `corev1.LifecycleHandler`. Kubegres runs
@@ -33,7 +45,7 @@ spec:
   lifecycle:
     preStop:
       exec:
-        command: ["sh", "-c", "pg_ctl stop -m fast -D \"$PGDATA\""]
+        command: ["sh", "-c", "sleep 5 && pg_ctl -D \"$PGDATA\" stop -m smart"]
 ```
 
 Changing either field rolls the primary and replica Pods.
