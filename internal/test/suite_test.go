@@ -33,6 +33,7 @@ import (
 	"reactive-tech.io/kubegres/internal/test/util/kindcluster"
 	"runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"testing"
 	"time"
 
@@ -122,7 +123,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme: scheme.Scheme,
+		// The test manager does not serve metrics; a fixed port would collide
+		// with anything else listening on the developer host or CI runner.
+		Metrics: metricsserver.Options{BindAddress: "0"},
+		Scheme:  scheme.Scheme,
 	})
 	Expect(err).ToNot(HaveOccurred())
 
@@ -130,10 +134,11 @@ var _ = BeforeSuite(func() {
 	eventRecorderTest = util2.MockEventRecorderTestUtil{}
 
 	err = (&controller.KubegresReconciler{
-		Client:   k8sManager.GetClient(),
-		Logger:   mockLogger,
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: record.EventRecorder(&eventRecorderTest),
+		Client:    k8sManager.GetClient(),
+		APIReader: k8sManager.GetAPIReader(),
+		Logger:    mockLogger,
+		Scheme:    k8sManager.GetScheme(),
+		Recorder:  record.EventRecorder(&eventRecorderTest),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

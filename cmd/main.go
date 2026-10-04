@@ -153,6 +153,7 @@ func main() {
 		Logger:                  ctrl.Log.WithName("controller").WithName(ctx2.KindKubegres),
 		Scheme:                  mgr.GetScheme(),
 		Recorder:                mgr.GetEventRecorderFor("Kubegres-controller"),
+		APIReader:               mgr.GetAPIReader(),
 		MaxConcurrentReconciles: maxConcurrentReconciles,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", ctx2.KindKubegres)

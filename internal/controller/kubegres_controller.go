@@ -51,6 +51,12 @@ type KubegresReconciler struct {
 	// parallel. Each Kubegres is independent, so values above 1 remove
 	// head-of-line blocking between clusters. Zero means the default of 1.
 	MaxConcurrentReconciles int
+	// APIReader reads the Kubegres object straight from the API server. The
+	// reconciler derives the next StatefulSet index and the active blocking
+	// operation from Kubegres status, so it must see its own latest status
+	// write even when the informer cache has not caught up yet. When nil the
+	// cached client is used.
+	APIReader client.Reader
 }
 
 //+kubebuilder:rbac:groups=kubegres.reactive-tech.io,resources=kubegres,verbs=get;list;watch;create;update;patch;delete
@@ -130,12 +136,17 @@ func (r *KubegresReconciler) returnn(result ctrl.Result,
 
 func (r *KubegresReconciler) getDeployedKubegresResource(ctx context.Context, req ctrl.Request) (*kubegresv1.Kubegres, error) {
 
-	// The reconcile request is enqueued from the informer after the cache has
-	// stored the event, so the cached read below already sees the change that
-	// triggered this reconcile. A conflicting status write is retried by the
-	// workqueue, which is cheaper than delaying every reconcile.
+	// Read the Kubegres object uncached. A reconcile triggered by a child
+	// event can start before the informer has stored the status written by
+	// the previous reconcile, and stale status (last created index, blocking
+	// operation) leads to duplicate StatefulSets. One direct GET per reconcile
+	// replaces the fixed one-second sleep that used to paper over this.
+	reader := r.APIReader
+	if reader == nil {
+		reader = r.Client
+	}
 	kubegres := &kubegresv1.Kubegres{}
-	err := r.Client.Get(ctx, req.NamespacedName, kubegres)
+	err := reader.Get(ctx, req.NamespacedName, kubegres)
 	if err == nil {
 		return kubegres, nil
 	}
