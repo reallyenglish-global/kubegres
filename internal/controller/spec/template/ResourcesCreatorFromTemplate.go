@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	"reactive-tech.io/kubegres/internal/controller/ctx"
+	"reactive-tech.io/kubegres/internal/controller/pvccleanup"
 
 	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
@@ -224,6 +225,7 @@ func (r *ResourcesCreatorFromTemplate) initStatefulSet(
 	container.Env = append(container.Env, core.EnvVar{Name: ctx.EnvVarNamePgData, Value: postgresSpec.Database.VolumeMount + "/" + ctx.DefaultDatabaseFolder})
 	container.Env = append(container.Env, r.kubegresContext.Kubegres.Spec.Env...)
 
+	statefulSetTemplate.Spec.PersistentVolumeClaimRetentionPolicy = pvccleanup.StatefulSetRetentionPolicy(postgresSpec.Volume)
 	statefulSetTemplate.Spec.VolumeClaimTemplates[0].Spec.StorageClassName = postgresSpec.Database.StorageClassName
 	statefulSetTemplate.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests = core.ResourceList{core.ResourceStorage: resource.MustParse(postgresSpec.Database.Size)}
 

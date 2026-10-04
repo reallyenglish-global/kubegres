@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctx2 "reactive-tech.io/kubegres/internal/controller/ctx"
 	"reactive-tech.io/kubegres/internal/controller/ctx/resources"
+	"reactive-tech.io/kubegres/internal/controller/pvccleanup"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,6 +84,18 @@ func (r *KubegresReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
+	orphanCleanupAfter, orphanErr := pvccleanup.MarkOrphanedPVCs(ctx, r.Client, kubegres.Namespace, kubegres.Name, kubegres.Spec.Volume, time.Now())
+	if orphanErr != nil {
+		return ctrl.Result{}, orphanErr
+	}
+	cleanupAfter, cleanupErr := pvccleanup.CleanupExpiredPVCs(ctx, r.Client, kubegres.Namespace, time.Now())
+	if cleanupErr != nil {
+		return ctrl.Result{}, cleanupErr
+	}
+	if orphanCleanupAfter > 0 && (cleanupAfter == 0 || orphanCleanupAfter < cleanupAfter) {
+		cleanupAfter = orphanCleanupAfter
+	}
+
 	nbreSecondsLeftBeforeTimeOut := resourcesContext.BlockingOperation.LoadActiveOperation()
 	resourcesContext.BlockingOperationLogger.Log()
 	resourcesContext.ResourcesStatesLogger.Log()
@@ -104,7 +117,11 @@ func (r *KubegresReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return r.returnn(ctrl.Result{}, nil, resourcesContext)
 	}
 
-	return r.returnn(ctrl.Result{}, r.enforceSpec(resourcesContext), resourcesContext)
+	result := ctrl.Result{}
+	if cleanupAfter > 0 {
+		result.RequeueAfter = cleanupAfter
+	}
+	return r.returnn(result, r.enforceSpec(resourcesContext), resourcesContext)
 }
 
 func (r *KubegresReconciler) returnn(result ctrl.Result,

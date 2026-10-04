@@ -27,9 +27,11 @@ import (
 	v1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 	operation2 "reactive-tech.io/kubegres/internal/controller/operation"
+	"reactive-tech.io/kubegres/internal/controller/pvccleanup"
 	"reactive-tech.io/kubegres/internal/controller/states"
 	"reactive-tech.io/kubegres/internal/controller/states/statefulset"
 	"strconv"
+	"time"
 )
 
 type PrimaryToReplicaFailOver struct {
@@ -398,6 +400,13 @@ func (r *PrimaryToReplicaFailOver) deletePrimaryStatefulSet() error {
 	r.kubegresContext.Log.Info("FailOver: Deleting the failing Primary StatefulSet.",
 		"Primary name", statefulSetToDelete.Name)
 
+	volume := v1.Volume{}
+	if r.kubegresContext.Kubegres != nil {
+		volume = r.kubegresContext.Kubegres.Spec.Volume
+	}
+	if err := pvccleanup.PrepareForStatefulSetDeletion(r.kubegresContext.Ctx, r.kubegresContext.Client, &statefulSetToDelete, volume, time.Now()); err != nil {
+		return err
+	}
 	err := r.kubegresContext.Client.Delete(r.kubegresContext.Ctx, &statefulSetToDelete)
 	if err == nil {
 		r.kubegresContext.Log.InfoEvent("FailOverPrimaryDeleted",

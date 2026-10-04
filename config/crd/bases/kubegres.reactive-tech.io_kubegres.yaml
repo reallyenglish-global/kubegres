@@ -4459,6 +4459,19 @@ spec:
                 type: string
               volume:
                 properties:
+                  pvcCleanupDuration:
+                    description: PvcCleanupDuration is required and non-negative when
+                      PvcCleanupPolicy is After.
+                    type: string
+                  pvcCleanupPolicy:
+                    default: Retain
+                    description: PvcCleanupPolicy defaults to Retain to preserve existing
+                      Kubegres behavior.
+                    enum:
+                    - Delete
+                    - After
+                    - Retain
+                    type: string
                   volumeClaimTemplates:
                     items:
                       properties:

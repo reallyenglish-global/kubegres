@@ -99,6 +99,12 @@ spec:
   #          medium: Memory
   #          sizeLimit: "600Mi"
   #
+  #    # PVC cleanup when a database StatefulSet is removed:
+  #    # Delete = immediately; Retain = keep for manual deletion; After = delayed cleanup.
+  #    pvcCleanupPolicy: Retain
+  #    # Required for After, for example: 720h (30 days).
+  #    # pvcCleanupDuration: 720h
+  #
   #    volumeClaimTemplates:
   #      - name: anyMount
   #        spec:

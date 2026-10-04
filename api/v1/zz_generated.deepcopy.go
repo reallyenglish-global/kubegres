@@ -22,6 +22,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -452,6 +453,11 @@ func (in *Volume) DeepCopyInto(out *Volume) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.PvcCleanupDuration != nil {
+		in, out := &in.PvcCleanupDuration, &out.PvcCleanupDuration
+		*out = new(metav1.Duration)
+		**out = **in
 	}
 }
 

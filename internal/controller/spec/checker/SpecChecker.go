@@ -53,6 +53,11 @@ func (r *SpecChecker) CheckSpec() (SpecCheckResult, error) {
 	specCheckResult := SpecCheckResult{}
 
 	spec := &r.kubegresContext.Kubegres.Spec
+	if errMsg := r.validatePvcCleanup(spec.Volume); errMsg != "" {
+		specCheckResult.HasSpecFatalError = true
+		specCheckResult.FatalErrorMessage = r.logSpecErrMsg(errMsg)
+		return specCheckResult, nil
+	}
 	if errMsg := r.validateCronTasks(spec.CronTasks); errMsg != "" {
 		specCheckResult.HasSpecFatalError = true
 		specCheckResult.FatalErrorMessage = r.logSpecErrMsg(errMsg)
@@ -231,6 +236,20 @@ func (r *SpecChecker) updateKubegresSpec(specName string, specValue string) {
 
 func (r *SpecChecker) isBackUpConfigured(spec *postgresV1.KubegresSpec) bool {
 	return spec.Backup.Schedule != ""
+}
+
+func (r *SpecChecker) validatePvcCleanup(volume postgresV1.Volume) string {
+	if volume.PvcCleanupPolicy != "" &&
+		volume.PvcCleanupPolicy != postgresV1.PvcCleanupPolicyDelete &&
+		volume.PvcCleanupPolicy != postgresV1.PvcCleanupPolicyAfter &&
+		volume.PvcCleanupPolicy != postgresV1.PvcCleanupPolicyRetain {
+		return "spec.volume.pvcCleanupPolicy must be Delete, After, or Retain."
+	}
+	if volume.PvcCleanupPolicy == postgresV1.PvcCleanupPolicyAfter &&
+		(volume.PvcCleanupDuration == nil || volume.PvcCleanupDuration.Duration < 0) {
+		return "spec.volume.pvcCleanupDuration must be a non-negative duration when pvcCleanupPolicy is After."
+	}
+	return ""
 }
 
 func (r *SpecChecker) validateCronTasks(tasks []postgresV1.KubegresCronTask) string {

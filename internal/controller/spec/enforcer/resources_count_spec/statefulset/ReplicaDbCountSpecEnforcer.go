@@ -26,10 +26,12 @@ import (
 	postgresV1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 	operation2 "reactive-tech.io/kubegres/internal/controller/operation"
+	"reactive-tech.io/kubegres/internal/controller/pvccleanup"
 	"reactive-tech.io/kubegres/internal/controller/spec/template"
 	"reactive-tech.io/kubegres/internal/controller/states"
 	"reactive-tech.io/kubegres/internal/controller/states/statefulset"
 	"strconv"
+	"time"
 )
 
 type ReplicaDbCountSpecEnforcer struct {
@@ -326,6 +328,13 @@ func (r *ReplicaDbCountSpecEnforcer) getReplicasReverseSortedByInstanceIndex() [
 func (r *ReplicaDbCountSpecEnforcer) deleteStatefulSet(statefulSetToDelete v1.StatefulSet) error {
 
 	r.kubegresContext.Log.Info("Deleting Replica statefulSet", "name", statefulSetToDelete.Name)
+	volume := postgresV1.Volume{}
+	if r.kubegresContext.Kubegres != nil {
+		volume = r.kubegresContext.Kubegres.Spec.Volume
+	}
+	if err := pvccleanup.PrepareForStatefulSetDeletion(r.kubegresContext.Ctx, r.kubegresContext.Client, &statefulSetToDelete, volume, time.Now()); err != nil {
+		return err
+	}
 	err := r.kubegresContext.Client.Delete(r.kubegresContext.Ctx, &statefulSetToDelete)
 
 	if err != nil {

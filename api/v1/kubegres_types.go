@@ -85,10 +85,27 @@ type VolumeClaimTemplate struct {
 	Spec v1.PersistentVolumeClaimSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
+// PvcCleanupPolicy controls what happens to database PVCs when their StatefulSet is deleted.
+// Delete removes PVCs with the StatefulSet, Retain keeps them indefinitely, and After
+// keeps them until PvcCleanupDuration has elapsed.
+type PvcCleanupPolicy string
+
+const (
+	PvcCleanupPolicyDelete PvcCleanupPolicy = "Delete"
+	PvcCleanupPolicyAfter  PvcCleanupPolicy = "After"
+	PvcCleanupPolicyRetain PvcCleanupPolicy = "Retain"
+)
+
 type Volume struct {
 	VolumeMounts         []v1.VolumeMount      `json:"volumeMounts,omitempty"`
 	Volumes              []v1.Volume           `json:"volumes,omitempty"`
 	VolumeClaimTemplates []VolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+	// PvcCleanupPolicy defaults to Retain to preserve existing Kubegres behavior.
+	// +kubebuilder:validation:Enum=Delete;After;Retain
+	// +kubebuilder:default=Retain
+	PvcCleanupPolicy PvcCleanupPolicy `json:"pvcCleanupPolicy,omitempty"`
+	// PvcCleanupDuration is required and non-negative when PvcCleanupPolicy is After.
+	PvcCleanupDuration *metav1.Duration `json:"pvcCleanupDuration,omitempty"`
 }
 
 type Probe struct {
