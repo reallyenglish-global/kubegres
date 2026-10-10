@@ -303,6 +303,7 @@ func (r *PrimaryToReplicaFailOver) promoteReplicaToPrimaryFor(newPrimary statefu
 	}
 
 	newPrimaryContainer := &newPrimary.StatefulSet.Spec.Template.Spec.Containers[0]
+	newPrimaryContainer.Resources = r.kubegresContext.Kubegres.Spec.ResourcesForPrimary()
 	newPrimaryContainer.VolumeMounts = append(newPrimaryContainer.VolumeMounts, volumeMount)
 
 	newPrimaryContainer.Lifecycle = &core.Lifecycle{

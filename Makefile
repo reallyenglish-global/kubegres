@@ -155,11 +155,12 @@ build-installer: manifests generate kustomize ## Generate dist/install.yaml with
 .PHONY: installer
 installer: manifests generate kustomize ## Regenerate the committed kubegres.yaml from config/ (image pinned in config/manager/kustomization.yaml).
 	$(KUSTOMIZE) build config/default > kubegres.yaml
+	cp config/crd/bases/kubegres.reactive-tech.io_kubegres.yaml charts/kubegres/crds/kubegres.yaml
 
 .PHONY: verify-generated
 verify-generated: installer ## Fail if generated CRDs, deepcopy, kubegres.yaml, or go.mod/go.sum are stale.
 	go mod tidy
-	git diff --exit-code -- api config kubegres.yaml go.mod go.sum
+	git diff --exit-code -- api config charts/kubegres/crds kubegres.yaml go.mod go.sum
 
 ##@ Deployment
 
