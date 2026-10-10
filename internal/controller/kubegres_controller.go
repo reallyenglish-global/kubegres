@@ -29,6 +29,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	kubegresv1 "reactive-tech.io/kubegres/api/v1"
@@ -82,9 +83,11 @@ func (r *KubegresReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	r.Logger.Info("=======================================================")
 	r.Logger.Info("=======================================================")
 	kubegres, err := r.getDeployedKubegresResource(ctx, req)
-	if err != nil {
+	if apierrors.IsNotFound(err) {
 		r.Logger.Info("Kubegres resource does not exist")
 		return ctrl.Result{}, nil
+	} else if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	resourcesContext, err := resources.CreateResourcesContext(kubegres, ctx, r.Logger, r.Client, r.Recorder)
@@ -142,7 +145,6 @@ func (r *KubegresReconciler) getDeployedKubegresResource(ctx context.Context, re
 		return kubegres, nil
 	}
 
-	r.Logger.Info("Kubegres resource does not exist")
 	return &kubegresv1.Kubegres{}, err
 }
 
