@@ -166,15 +166,17 @@ type Lifecycle struct {
 }
 
 type KubegresSpec struct {
-	Replicas            *int32                      `json:"replicas,omitempty"`
-	Image               string                      `json:"image,omitempty"`
-	Port                int32                       `json:"port,omitempty"`
-	ImagePullSecrets    []v1.LocalObjectReference   `json:"imagePullSecrets,omitempty"`
-	CustomConfig        string                      `json:"customConfig,omitempty"`
-	Database            KubegresDatabase            `json:"database,omitempty"`
-	Failover            KubegresFailover            `json:"failover,omitempty"`
-	PodDisruptionBudget KubegresPodDisruptionBudget `json:"podDisruptionBudget,omitempty"`
-	Backup              KubegresBackUp              `json:"backup,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
+	//+kubebuilder:validation:Minimum=0
+	TerminationGracePeriodSeconds *int64                      `json:"terminationGracePeriodSeconds,omitempty"`
+	Image                         string                      `json:"image,omitempty"`
+	Port                          int32                       `json:"port,omitempty"`
+	ImagePullSecrets              []v1.LocalObjectReference   `json:"imagePullSecrets,omitempty"`
+	CustomConfig                  string                      `json:"customConfig,omitempty"`
+	Database                      KubegresDatabase            `json:"database,omitempty"`
+	Failover                      KubegresFailover            `json:"failover,omitempty"`
+	PodDisruptionBudget           KubegresPodDisruptionBudget `json:"podDisruptionBudget,omitempty"`
+	Backup                        KubegresBackUp              `json:"backup,omitempty"`
 	//+listType=map
 	//+listMapKey=name
 	CronTasks                []KubegresCronTask      `json:"cronTasks,omitempty"`

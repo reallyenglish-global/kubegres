@@ -6,6 +6,8 @@ stateful-set's life-cycle and data replication could be with Kubernetes.
 
 This is `reallyenglish-global/kubegres`, a fork of [reactive-tech/kubegres](https://github.com/reactive-tech/kubegres) taken at upstream tag `v1.18`. It exists because the fork needed newer Kubernetes and `sigs.k8s.io/controller-runtime` support than upstream tracked at the time, and a set of operational features upstream does not have: preStop and startupProbe overrides, failover on primary Pod drain with a managed PodDisruptionBudget, drain-aware replica-first failover, custom backup images, coordinated PostgreSQL minor image upgrades, independent scheduled cron tasks, automatic database PVC expansion, ephemeral backup PVCs, and WAL archive/restore commands.
 
+See [`docs/postgres-major-upgrades.md`](docs/postgres-major-upgrades.md) for the explicit, user-controlled `MajorUpgrade` workflow. Major-version image changes are never applied as a normal StatefulSet rollout.
+
 See [CHANGELOG.md](CHANGELOG.md) for release history. If you are moving from `reactive-tech/kubegres` v1.18, read [`docs/upgrading-from-upstream.md`](docs/upgrading-from-upstream.md) first.
 
 ## Install
@@ -23,6 +25,8 @@ kubectl apply -f https://github.com/reallyenglish-global/kubegres/releases/downl
 ```
 
 The operator image is published at `ghcr.io/reallyenglish-global/kubegres`.
+
+For Helm users, the repository includes a chart at [`charts/kubegres`](charts/kubegres/README.md). It installs the operator, RBAC, metrics service, and CRD; see the chart README for CRD lifecycle guidance.
 
 ## Compatibility
 
@@ -42,7 +46,7 @@ Install the fork as described above. For the `kind: Kubegres` resource fields, u
 
 * [`docs/cron-tasks.md`](docs/cron-tasks.md): independent `spec.cronTasks` CronJobs used for scheduled database maintenance. The feature is separate from, and does not change, `spec.backup`.
 * [`docs/backup-storage.md`](docs/backup-storage.md): using an existing backup PVC or temporary generic ephemeral storage for backup Pods.
-* [`docs/container-overrides.md`](docs/container-overrides.md): replacing the startup probe (`spec.probe.startupProbe`) and the `preStop` hook (`spec.lifecycle.preStop`) on the PostgreSQL container.
+* [`docs/container-overrides.md`](docs/container-overrides.md): graceful PostgreSQL shutdown, termination grace periods, and replacing the startup probe (`spec.probe.startupProbe`) or `preStop` hook (`spec.lifecycle.preStop`) on the PostgreSQL container.
 * [`docs/primary-drain-failover.md`](docs/primary-drain-failover.md): the opt-in `spec.failover.onPrimaryPodDrain` feature and the managed PodDisruptionBudget.
 * [`docs/pitr-archive.md`](docs/pitr-archive.md): custom WAL archive and restore commands using the database Pod identity.
 * [`docs/postgres-minor-upgrades.md`](docs/postgres-minor-upgrades.md): how a `spec.image` minor-version tag change is rolled out as a coordinated upgrade.
