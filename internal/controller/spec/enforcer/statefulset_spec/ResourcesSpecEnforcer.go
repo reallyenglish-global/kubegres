@@ -61,7 +61,8 @@ func (r *ResourcesSpecEnforcer) EnforceSpec(statefulSet *apps.StatefulSet) (wasS
 }
 
 func resourcesForStatefulSet(spec postgresV1.KubegresSpec, statefulSet *apps.StatefulSet) v1.ResourceRequirements {
-	switch statefulSet.Labels["replicationRole"] {
+	// Match StatefulSetsStates: the Pod-template role is authoritative.
+	switch statefulSet.Spec.Template.Labels["replicationRole"] {
 	case "primary":
 		return spec.ResourcesForPrimary()
 	case "replica":

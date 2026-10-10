@@ -199,19 +199,19 @@ type KubegresSpec struct {
 	ServiceAccountName       string                  `json:"serviceAccountName,omitempty"`
 }
 
-// ResourcesForPrimary returns the primary-specific requirements when set, or
+// ResourcesForPrimary returns the primary-specific requirements when non-empty, or
 // the backwards-compatible common requirements otherwise.
 func (s KubegresSpec) ResourcesForPrimary() v1.ResourceRequirements {
-	if s.Primary.Resources.Requests != nil || s.Primary.Resources.Limits != nil {
+	if len(s.Primary.Resources.Requests) > 0 || len(s.Primary.Resources.Limits) > 0 {
 		return s.Primary.Resources
 	}
 	return s.Resources
 }
 
-// ResourcesForReplica returns the replica-specific requirements when set, or
+// ResourcesForReplica returns the replica-specific requirements when non-empty, or
 // the backwards-compatible common requirements otherwise.
 func (s KubegresSpec) ResourcesForReplica() v1.ResourceRequirements {
-	if s.Replica.Resources.Requests != nil || s.Replica.Resources.Limits != nil {
+	if len(s.Replica.Resources.Requests) > 0 || len(s.Replica.Resources.Limits) > 0 {
 		return s.Replica.Resources
 	}
 	return s.Resources
