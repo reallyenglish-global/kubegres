@@ -35,6 +35,11 @@ if [ "${BOOTSTRAP_COMPLETED:-false}" = "true" ]; then fail 'completed bootstrap 
   grep -qx "cr_uid=$BOOTSTRAP_CR_UID" "$identity" || fail 'staging identity mismatch'
   grep -qx "pvc=$BOOTSTRAP_PVC_NAME" "$identity" || fail 'staging PVC mismatch'
   [ "$(wc -l < "$identity")" -eq 2 ] || fail 'staging identity is invalid'
+  # A killed init process may leave its staging postmaster alive. Never remove
+  # its data directory until it has stopped; this storage belongs to this identity.
+  if [ -f "$stage/data/postmaster.pid" ] && pg_ctl -D "$stage/data" status >/dev/null 2>&1; then
+    timeout --foreground "${BOOTSTRAP_TIMEOUT_SECONDS}s" pg_ctl -D "$stage/data" -m fast -w stop >/dev/null 2>&1 || fail 'interrupted staging database did not stop cleanly'
+  fi
   rm -rf "$stage"
 }
 mkdir -p "$stage/data"
@@ -84,7 +89,6 @@ unset PGHOST
 if ! stop_server; then fail 'staging database did not stop cleanly'; fi
 trap - EXIT HUP INT TERM
 rm -f "$stage/source.dump" "$stage/postgres-password"
-rm -f "$identity"
 rm -rf "$stage/socket"
 {
   printf '%s\n' 'version=kubegres-logical-bootstrap-v1' "cr_uid=$BOOTSTRAP_CR_UID" "pvc=$BOOTSTRAP_PVC_NAME"
@@ -94,4 +98,5 @@ rm -rf "$stage/socket"
 rmdir "$target" 2>/dev/null || true
 [ ! -e "$target" ] || fail 'target appeared during publication'
 mv -T "$stage/data" "$target"
+rm -f "$identity"
 rmdir "$stage"
