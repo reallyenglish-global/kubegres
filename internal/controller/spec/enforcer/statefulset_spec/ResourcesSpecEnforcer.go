@@ -23,7 +23,6 @@ package statefulset_spec
 import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	postgresV1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 )
@@ -96,9 +95,8 @@ func (r *ResourcesSpecEnforcer) compareResourceLists(current v1.ResourceList, ex
 	}
 
 	for key, expectedElement := range expected {
-		expectedElementParsed := resource.MustParse(expectedElement.String())
-		currentElement := current[key]
-		if expectedElementParsed != currentElement {
+		currentElement, exists := current[key]
+		if !exists || expectedElement.Cmp(currentElement) != 0 {
 			return false
 		}
 	}
