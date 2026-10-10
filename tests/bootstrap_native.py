@@ -179,6 +179,37 @@ class NativeBootstrap(unittest.TestCase):
         self.assertNotEqual(r.returncode,0)
         self.assertIn('no PG_VERSION',r.stdout)
 
+    def test_shutdown_failure_preserves_live_storage(self):
+        self.wrapper('pg_ctl', 'for arg do [ "$arg" != stop ] || exit 42; done\nexec '+str(BIN/'pg_ctl')+' "$@"')
+        self.bootstrap(False,'staging database did not stop cleanly')
+        self.assertTrue((self.stage/'identity').exists())
+        self.assertTrue((self.stage/'data'/'PG_VERSION').exists())
+        self.assertEqual(self.call(['pg_ctl','-D',str(self.stage/'data'),'status'],check=False).returncode,0)
+        # A second failed stop must leave the same live storage in place.
+        self.bootstrap(False,'interrupted staging database did not stop cleanly')
+        self.assertTrue((self.stage/'data'/'PG_VERSION').exists())
+        self.e['PATH']=self.env['PATH']
+        self.bootstrap()
+
+    def test_startup_failure_with_live_server_preserves_storage(self):
+        self.wrapper('pg_ctl', 'for arg do\n case "$arg" in\n stop) exit 42;;\n start) '+str(BIN/'pg_ctl')+' "$@"; exit 42;;\n esac\ndone\nexec '+str(BIN/'pg_ctl')+' "$@"')
+        self.bootstrap(False,'staging database start failed')
+        self.assertTrue((self.stage/'identity').exists())
+        self.assertTrue((self.stage/'data'/'PG_VERSION').exists())
+        self.assertEqual(self.call(['pg_ctl','-D',str(self.stage/'data'),'status'],check=False).returncode,0)
+        self.e['PATH']=self.env['PATH']
+        self.bootstrap()
+
+    def test_restore_failure_and_failed_stop_retains_storage(self):
+        self.wrapper('pg_restore', 'for archive do :; done\nprintf broken > "$archive"\nexec '+str(BIN/'pg_restore')+' "$@"')
+        self.wrapper('pg_ctl', 'for arg do [ "$arg" != stop ] || exit 42; done\nexec '+str(BIN/'pg_ctl')+' "$@"')
+        self.bootstrap(False,'destination restore failed')
+        self.assertTrue((self.stage/'identity').exists())
+        self.assertTrue((self.stage/'data'/'PG_VERSION').exists())
+        self.assertEqual(self.call(['pg_ctl','-D',str(self.stage/'data'),'status'],check=False).returncode,0)
+        self.e['PATH']=self.env['PATH']
+        self.bootstrap()
+
     def test_foreign_staging_rejected(self):
         self.stage.mkdir(); (self.stage/'identity').write_text('cr_uid=foreign\npvc=synthetic-pvc\n')
         self.bootstrap(False,'staging identity mismatch')

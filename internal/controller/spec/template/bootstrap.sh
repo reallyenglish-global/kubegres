@@ -69,10 +69,20 @@ printf '%s\n' "$POSTGRES_PASSWORD" > "$stage/postgres-password"
 chmod 600 "$stage/postgres-password"
 if ! timeout --foreground "${BOOTSTRAP_TIMEOUT_SECONDS}s" initdb -D "$stage/data" --username="${POSTGRES_USER:-postgres}" --pwfile="$stage/postgres-password" --auth-local=trust --auth-host=scram-sha-256 >/dev/null 2>&1; then fail 'staging database initialization failed'; fi
 mkdir -p "$stage/socket"
+stop_server() { timeout --foreground "${BOOTSTRAP_TIMEOUT_SECONDS}s" pg_ctl -D "$stage/data" -m fast -w stop >/dev/null 2>&1; }
+cleanup_stage() {
+  if [ -f "$stage/data/postmaster.pid" ] && pg_ctl -D "$stage/data" status >/dev/null 2>&1; then
+    if ! stop_server; then
+      echo 'bootstrap failed: staging shutdown failed; storage retained for recovery' >&2
+      return 1
+    fi
+  fi
+  rm -rf "$stage"
+}
+# Install before startup: pg_ctl may fail/timed-out even after a server starts.
+trap 'cleanup_stage' EXIT
+trap 'exit 1' HUP INT TERM
 if ! timeout --foreground "${BOOTSTRAP_TIMEOUT_SECONDS}s" pg_ctl -D "$stage/data" -o "-c listen_addresses='' -c unix_socket_directories=$stage/socket" -w start >/dev/null 2>&1; then fail 'staging database start failed'; fi
-cleanup_server() { pg_ctl -D "$stage/data" -m fast -w stop >/dev/null 2>&1 || true; }
-stop_server() { pg_ctl -D "$stage/data" -m fast -w stop >/dev/null 2>&1; }
-trap 'cleanup_server; rm -rf "$stage"' EXIT HUP INT TERM
 
 export PGHOST="$stage/socket"
 case "$BOOTSTRAP_DESTINATION_DATABASE" in *[!A-Za-z0-9_]*|'') echo 'destination database is not a safe identifier' >&2; exit 1;; esac

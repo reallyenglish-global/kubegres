@@ -15,6 +15,7 @@ Coverage:
 - An unprivileged source user causes a real pg_dump permission failure.
 - A deliberately corrupted real dump causes real pg_restore failure; staging is cleaned without publishing PGDATA. Only the corruption injection is a wrapper, not the PostgreSQL executable.
 - SIGKILL interruption before restore (with an independently running real staging postmaster) and immediately before rename can restart successfully. The publication gate wraps `mv`; the restore gate wraps `pg_restore` and interrupts before invoking it.
+- Startup/shutdown failure injection keeps a real running staging postmaster's data and identity intact; a later retry shuts it down safely and completes. Restore failure combined with failed shutdown has the same retention guarantee.
 - A stale postmaster PID file is recoverable. Foreign staging identity, nonempty unmarked PGDATA and a marker without PG_VERSION are rejected.
 - A completed marker avoids re-import even with an unreachable source; CR UID/PVC name mismatch fails; completed-status input with missing storage fails closed.
 
