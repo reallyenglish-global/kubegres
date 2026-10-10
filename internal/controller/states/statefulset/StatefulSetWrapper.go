@@ -3,6 +3,7 @@ package statefulset
 import (
 	"errors"
 	"k8s.io/api/apps/v1"
+	"slices"
 	"sort"
 	"strconv"
 )
@@ -38,11 +39,11 @@ func (r *StatefulSetWrappers) Add(statefulSetWrapper StatefulSetWrapper) {
 }
 
 func (r *StatefulSetWrappers) GetAllSortedByInstanceIndex() []StatefulSetWrapper {
-	return r.copy(r.statefulSetsSortedByInstanceIndex)
+	return slices.Clone(r.statefulSetsSortedByInstanceIndex)
 }
 
 func (r *StatefulSetWrappers) GetAllReverseSortedByInstanceIndex() []StatefulSetWrapper {
-	return r.copy(r.statefulSetsReverseSortedByInstanceIndex)
+	return slices.Clone(r.statefulSetsReverseSortedByInstanceIndex)
 }
 
 func (r *StatefulSetWrappers) GetByInstanceIndex(instanceIndex int32) (StatefulSetWrapper, error) {
@@ -65,12 +66,6 @@ func (r *StatefulSetWrappers) GetByName(statefulSetName string) (StatefulSetWrap
 	}
 
 	return StatefulSetWrapper{}, errors.New("Given StatefulSet's name '" + statefulSetName + "' does not exist.")
-}
-
-func (r *StatefulSetWrappers) copy(toCopy []StatefulSetWrapper) []StatefulSetWrapper {
-	var copyAll []StatefulSetWrapper
-	copy(toCopy, copyAll)
-	return toCopy
 }
 
 /*
