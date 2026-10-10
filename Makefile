@@ -1,7 +1,7 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.36.0
+ENVTEST_K8S_VERSION = 1.37.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -46,6 +46,7 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	cp config/crd/bases/kubegres.reactive-tech.io_kubegres.yaml charts/kubegres/crds/kubegres.yaml
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -154,7 +155,7 @@ installer: manifests generate kustomize ## Regenerate the committed kubegres.yam
 .PHONY: verify-generated
 verify-generated: installer ## Fail if generated CRDs, deepcopy, kubegres.yaml, or go.mod/go.sum are stale.
 	go mod tidy
-	git diff --exit-code -- api config kubegres.yaml go.mod go.sum
+	git diff --exit-code -- api config charts/kubegres/crds kubegres.yaml go.mod go.sum
 
 ##@ Deployment
 
@@ -210,8 +211,8 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
-CONTROLLER_TOOLS_VERSION ?= v0.21.0
-ENVTEST_VERSION ?= release-0.24
+CONTROLLER_TOOLS_VERSION ?= v0.22.0
+ENVTEST_VERSION ?= v0.25.2
 GOLANGCI_LINT_VERSION ?= v1.61.0
 
 .PHONY: kustomize
