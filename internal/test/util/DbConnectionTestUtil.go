@@ -69,6 +69,9 @@ func InitDbConnectionDbUtil(resourceCreator TestResourceCreator, kubegresName st
 }
 
 func (r *DbConnectionDbUtil) Close() {
+	if r.db == nil {
+		return
+	}
 	r.logInfo("Closing DB connection '" + r.LogLabel + "'")
 	err := r.db.Close()
 	if err != nil {
@@ -110,19 +113,18 @@ func (r *DbConnectionDbUtil) connect() bool {
 		"password=%s dbname=%s sslmode=disable",
 		resourceConfigs.DbHost, r.Port, resourceConfigs.DbUser, resourceConfigs.DbPassword, resourceConfigs.DbName)
 
-	if r.ping(psqlInfo) {
+	if r.ping() {
 		return true
 	}
 
 	var err error
 	r.db, err = sql.Open("postgres", psqlInfo)
 	if err != nil {
-		r.logError("Unable to connect to: "+psqlInfo, err)
-		_ = r.db.Close()
+		r.logError("Unable to connect to: "+r.connectionDescription(), err)
 		return false
 	}
 
-	if !r.ping(psqlInfo) {
+	if !r.ping() {
 		return false
 	}
 
@@ -144,19 +146,25 @@ func (r *DbConnectionDbUtil) connect() bool {
 	return true
 }
 
-func (r *DbConnectionDbUtil) ping(psqlInfo string) bool {
+func (r *DbConnectionDbUtil) ping() bool {
 	if r.db == nil {
 		return false
 	}
 
 	err := r.db.Ping()
 	if err != nil {
-		r.logError("Ping failed to: "+psqlInfo, err)
+		r.logError("Ping failed to: "+r.connectionDescription(), err)
 		_ = r.db.Close()
 		return false
 	}
-	r.logError("Ping succeeded to: "+psqlInfo, err)
+	r.logInfo("Ping succeeded to: " + r.connectionDescription())
 	return true
+}
+
+// connectionDescription identifies the DB connection in logs without the password.
+func (r *DbConnectionDbUtil) connectionDescription() string {
+	return fmt.Sprintf("host=%s port=%d user=%s dbname=%s",
+		resourceConfigs.DbHost, r.Port, resourceConfigs.DbUser, resourceConfigs.DbName)
 }
 
 func (r *DbConnectionDbUtil) DeleteUser(userIdToDelete string) bool {
