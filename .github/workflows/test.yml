@@ -21,6 +21,29 @@ jobs:
       - name: Verify generated files are committed
         run: make verify-generated
 
+  bootstrap-native:
+    name: Native PostgreSQL bootstrap regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL 18 client and server tools
+        run: |
+          curl --fail --silent --show-error https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /tmp/pgdg.asc
+          sudo install -m 644 /tmp/pgdg.asc /usr/share/keyrings/pgdg.asc
+          . /etc/os-release
+          printf 'deb [signed-by=/usr/share/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt %s-pgdg main\n' "$VERSION_CODENAME" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-18
+      - name: Run real isolated bootstrap regressions
+        env:
+          PG_BINDIR: /usr/lib/postgresql/18/bin
+        run: |
+          "$PG_BINDIR/postgres" --version
+          sh -n internal/controller/spec/template/bootstrap.sh
+          python3 -m py_compile tests/bootstrap_native.py
+          make test-bootstrap-native
+
   test:
     needs: fast
     name: Run Kubegres Tests (${{ matrix.group }})

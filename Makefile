@@ -60,6 +60,10 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
+.PHONY: test-bootstrap-native
+test-bootstrap-native: ## Run opt-in disposable real PostgreSQL bootstrap regressions (non-root; PG_BINDIR selects tools).
+	python3 tests/bootstrap_native.py -v
+
 .PHONY: test-fast
 test-fast: ## Fail fast on pure configuration, cleanup, compilation, and shard coverage.
 	go test ./api/... ./internal/controller/... ./internal/test/util/... -count=1 -timeout=2m

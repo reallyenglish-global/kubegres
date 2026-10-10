@@ -47,11 +47,13 @@ Install the fork as described above. For the `kind: Kubegres` resource fields, u
 * [`docs/cron-tasks.md`](docs/cron-tasks.md): independent `spec.cronTasks` CronJobs used for scheduled database maintenance. The feature is separate from, and does not change, `spec.backup`.
 * [`docs/backup-storage.md`](docs/backup-storage.md): using an existing backup PVC or temporary generic ephemeral storage for backup Pods.
 * [`docs/container-overrides.md`](docs/container-overrides.md): graceful PostgreSQL shutdown, termination grace periods, and replacing the startup probe (`spec.probe.startupProbe`) or `preStop` hook (`spec.lifecycle.preStop`) on the PostgreSQL container.
+* [`docs/resources.md`](docs/resources.md): common and role-specific primary/replica CPU and memory requests and limits.
 * [`docs/primary-drain-failover.md`](docs/primary-drain-failover.md): the opt-in `spec.failover.onPrimaryPodDrain` feature and the managed PodDisruptionBudget.
 * [`docs/pitr-archive.md`](docs/pitr-archive.md): custom WAL archive and restore commands using the database Pod identity.
 * [`docs/postgres-minor-upgrades.md`](docs/postgres-minor-upgrades.md): how a `spec.image` minor-version tag change is rolled out as a coordinated upgrade.
 * [`docs/pod-loss-classification-and-safe-node-maintenance.md`](docs/pod-loss-classification-and-safe-node-maintenance.md): design for classifying why a database Pod was lost and running safe planned node maintenance.
 * [`docs/handoff-maintenance-operation-v1.md`](docs/handoff-maintenance-operation-v1.md): implementation handoff for the `MaintenanceOperation` CRD contract (schema only, no reconciler yet).
+* [`docs/bootstrap-external-database.md`](docs/bootstrap-external-database.md): the bounded, one-time logical import from a trusted external PostgreSQL database. This is not full lifecycle migration support.
 * [`docs/upgrading-from-upstream.md`](docs/upgrading-from-upstream.md): moving an existing `reactive-tech/kubegres` v1.18 install to this fork.
 
 **Features**

@@ -105,6 +105,10 @@ func (r *ResourcesCreatorFromTemplate) CreatePrimaryStatefulSet(statefulSetInsta
 
 	primaryServiceName := r.kubegresContext.GetServiceResourceName(true)
 	r.initStatefulSet(primaryServiceName, &statefulSetTemplate, statefulSetInstanceIndex)
+	primaryPVCName := fmt.Sprintf("%s-%s-0", ctx.DatabaseVolumeName, statefulSetTemplate.Name)
+	if err := configureLogicalBootstrap(r.kubegresContext.Kubegres, &statefulSetTemplate.Spec.Template.Spec, primaryPVCName); err != nil {
+		return apps.StatefulSet{}, err
+	}
 	r.customConfigSpecHelper.ConfigureStatefulSet(&statefulSetTemplate)
 	r.configureArchive(&statefulSetTemplate)
 	return statefulSetTemplate, nil
@@ -265,8 +269,14 @@ func (r *ResourcesCreatorFromTemplate) initStatefulSet(
 	if len(postgresSpec.Scheduler.Tolerations) > 0 {
 		statefulSetTemplateSpec.Tolerations = postgresSpec.Scheduler.Tolerations
 	}
-	if postgresSpec.Resources.Requests != nil || postgresSpec.Resources.Limits != nil {
-		statefulSetTemplate.Spec.Template.Spec.Containers[0].Resources = postgresSpec.Resources
+	resources := postgresSpec.Resources
+	if statefulSetTemplate.Labels["replicationRole"] == "primary" {
+		resources = postgresSpec.ResourcesForPrimary()
+	} else if statefulSetTemplate.Labels["replicationRole"] == "replica" {
+		resources = postgresSpec.ResourcesForReplica()
+	}
+	if resources.Requests != nil || resources.Limits != nil {
+		statefulSetTemplate.Spec.Template.Spec.Containers[0].Resources = resources
 	}
 
 	if postgresSpec.Volume.VolumeClaimTemplates != nil {
