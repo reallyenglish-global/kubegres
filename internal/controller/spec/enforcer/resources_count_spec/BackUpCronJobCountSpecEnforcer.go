@@ -51,12 +51,16 @@ func (r *BackUpCronJobCountSpecEnforcer) EnforceSpec() error {
 
 	if r.isCronJobDeployed() {
 
-		if !r.hasSpecChanged() {
+		hasSpecChanged, err := r.hasSpecChanged()
+		if err != nil {
+			r.kubegresContext.Log.ErrorEvent("BackUpCronJobSpecCheckErr", err, "Unable to check whether the BackUp CronJob spec has changed.")
+			return err
+		}
+		if !hasSpecChanged {
 			return nil
 		}
 
-		err := r.deleteCronJob()
-		if err != nil {
+		if err := r.deleteCronJob(); err != nil {
 			return err
 		}
 	}
@@ -129,7 +133,7 @@ func (r *BackUpCronJobCountSpecEnforcer) isCronJobDeployed() bool {
 	return r.resourcesStates.BackUp.IsCronJobDeployed
 }
 
-func (r *BackUpCronJobCountSpecEnforcer) hasSpecChanged() (hasSpecChanged bool) {
+func (r *BackUpCronJobCountSpecEnforcer) hasSpecChanged() (hasSpecChanged bool, err error) {
 
 	cronJob := r.resourcesStates.BackUp.DeployedCronJob
 	cronJobSpec := &cronJob.Spec
@@ -158,9 +162,9 @@ func (r *BackUpCronJobCountSpecEnforcer) hasSpecChanged() (hasSpecChanged bool) 
 	expectedPvcName := kubegresBackUpSpec.PvcName
 	expectedUsesEphemeral := expectedPvcName == ""
 	if expectedPvcName != "" {
-		usesEphemeral, err := r.shouldUseEphemeralVolume()
-		if err == nil {
-			expectedUsesEphemeral = usesEphemeral
+		expectedUsesEphemeral, err = r.shouldUseEphemeralVolume()
+		if err != nil {
+			return false, err
 		}
 	}
 	if currentPvcName != expectedPvcName || currentUsesEphemeral != expectedUsesEphemeral {
@@ -208,7 +212,7 @@ func (r *BackUpCronJobCountSpecEnforcer) hasSpecChanged() (hasSpecChanged bool) 
 		r.logSpecChange("spec.backup.timeZone")
 	}
 
-	return hasSpecChanged
+	return hasSpecChanged, nil
 }
 
 func (r *BackUpCronJobCountSpecEnforcer) deleteCronJob() error {
