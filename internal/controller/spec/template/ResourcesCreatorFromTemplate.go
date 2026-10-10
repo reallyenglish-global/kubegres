@@ -239,6 +239,10 @@ func (r *ResourcesCreatorFromTemplate) initStatefulSet(
 
 	statefulSetTemplateSpec := &statefulSetTemplate.Spec.Template.Spec
 
+	if postgresSpec.TerminationGracePeriodSeconds != nil {
+		statefulSetTemplateSpec.TerminationGracePeriodSeconds = postgresSpec.TerminationGracePeriodSeconds
+	}
+
 	if postgresSpec.ImagePullSecrets != nil {
 		statefulSetTemplateSpec.ImagePullSecrets = append(statefulSetTemplateSpec.ImagePullSecrets, postgresSpec.ImagePullSecrets...)
 	}

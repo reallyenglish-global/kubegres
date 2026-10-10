@@ -16,7 +16,7 @@ import (
 func defaultPreStopHandler() *core.LifecycleHandler {
 	return &core.LifecycleHandler{
 		Exec: &core.ExecAction{
-			Command: []string{"sh", "-c", "pg_ctl -D $PGDATA stop -m fast"},
+			Command: []string{"sh", "-c", "sleep 5 && pg_ctl -D $PGDATA -w -t 2 stop -m smart || pg_ctl -D $PGDATA -w stop -m fast"},
 		},
 	}
 }
