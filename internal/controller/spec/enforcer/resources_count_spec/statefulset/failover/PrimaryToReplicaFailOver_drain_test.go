@@ -202,3 +202,51 @@ func TestPromoteReplicaToPrimaryAppliesPrimaryResources(t *testing.T) {
 		})
 	}
 }
+
+type updateErrorClient struct {
+	client.Client
+	err error
+}
+
+func (c updateErrorClient) Update(context.Context, client.Object, ...client.UpdateOption) error {
+	return c.err
+}
+
+func TestPromoteReplicaToPrimaryReturnsUpdateError(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	kubegres := &v1.Kubegres{ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"}}
+	statefulSet := appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "pg-1", Namespace: "default", Labels: map[string]string{"replicationRole": "replica"}},
+		Spec: appsv1.StatefulSetSpec{Template: core.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"replicationRole": "replica"}},
+			Spec:       core.PodSpec{Containers: []core.Container{{Name: "postgres"}}},
+		}},
+	}
+	wantErr := errors.New("update failed")
+	kubegresContext := ctx.KubegresContext{
+		Kubegres: kubegres,
+		Ctx:      context.Background(),
+		Client:   updateErrorClient{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(&statefulSet).Build(), err: wantErr},
+		Log:      log.LogWrapper{Kubegres: kubegres, Recorder: record.NewFakeRecorder(10)},
+		Status:   &status.KubegresStatusWrapper{Kubegres: kubegres},
+	}
+	blockingOperation := operation2.CreateBlockingOperation(kubegresContext)
+	failover := CreatePrimaryToReplicaFailOver(kubegresContext, states.ResourcesStates{}, blockingOperation)
+	blockingOperation.AddConfig(failover.CreateOperationConfigForFailingOver())
+
+	err := failover.promoteReplicaToPrimaryFor(
+		statefulset.StatefulSetWrapper{InstanceIndex: 1, StatefulSet: statefulSet},
+		operation2.OperationIdPrimaryDbCountSpecEnforcement,
+		operation2.OperationStepIdPrimaryDbFailingOver,
+	)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("promoteReplicaToPrimaryFor() error = %v, want %v", err, wantErr)
+	}
+	if active := blockingOperation.GetActiveOperation(); active.OperationId != "" {
+		t.Fatalf("active blocking operation = %q, want none after a failed promotion", active.OperationId)
+	}
+}
