@@ -325,9 +325,9 @@ func (r *PrimaryToReplicaFailOver) promoteReplicaToPrimaryFor(newPrimary statefu
 	r.kubegresContext.Log.InfoEvent("FailOver", "FailOver: Promoting Replica to Primary.",
 		"Replica to promote", newPrimary.StatefulSet.Name)
 
-	err2 := r.kubegresContext.Client.Update(r.kubegresContext.Ctx, &newPrimary.StatefulSet)
-	if err2 != nil {
-		r.kubegresContext.Log.ErrorEvent("FailOverErr", err2,
+	err = r.kubegresContext.Client.Update(r.kubegresContext.Ctx, &newPrimary.StatefulSet)
+	if err != nil {
+		r.kubegresContext.Log.ErrorEvent("FailOverErr", err,
 			"FailOver: Unable to promote Replica to Primary.",
 			"Replica to promote", newPrimary.StatefulSet.Name)
 		r.blockingOperation.RemoveActiveOperation()
