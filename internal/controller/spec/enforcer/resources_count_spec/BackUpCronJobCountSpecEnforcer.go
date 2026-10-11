@@ -167,6 +167,11 @@ func (r *BackUpCronJobCountSpecEnforcer) hasSpecChanged() (hasSpecChanged bool, 
 			return false, err
 		}
 	}
+	if expectedUsesEphemeral {
+		// The CronJob falls back to an ephemeral volume while the configured
+		// PVC does not exist, so it is expected to reference no PVC.
+		expectedPvcName = ""
+	}
 	if currentPvcName != expectedPvcName || currentUsesEphemeral != expectedUsesEphemeral {
 		hasSpecChanged = true
 		r.logSpecChange("spec.backup.pvcName")

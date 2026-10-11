@@ -20,15 +20,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
-func TestBackUpEnforceSpecKeepsCronJobWhenPvcLookupFails(t *testing.T) {
-	scheme := runtime.NewScheme()
-	if err := batch.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := core.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-
+// newEphemeralBackUpFixture returns a Kubegres whose backup names a PVC, and
+// a CronJob created with an ephemeral volume because that PVC did not exist.
+func newEphemeralBackUpFixture() (*postgresV1.Kubegres, *batch.CronJob) {
 	kubegres := &postgresV1.Kubegres{
 		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
 		Spec: postgresV1.KubegresSpec{
@@ -40,8 +34,6 @@ func TestBackUpEnforceSpecKeepsCronJobWhenPvcLookupFails(t *testing.T) {
 			},
 		},
 	}
-	// The CronJob was created with an ephemeral volume because the backup PVC
-	// did not exist yet.
 	cronJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{Name: "backup-pg", Namespace: "default"},
 		Spec: batch.CronJobSpec{
@@ -55,14 +47,24 @@ func TestBackUpEnforceSpecKeepsCronJobWhenPvcLookupFails(t *testing.T) {
 			}}}},
 		},
 	}
+	return kubegres, cronJob
+}
 
-	wantErr := errors.New("api server unavailable")
+func newBackUpEnforcerForTest(t *testing.T, kubegres *postgresV1.Kubegres, cronJob *batch.CronJob, pvcGetErr error) (BackUpCronJobCountSpecEnforcer, *bool) {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	if err := batch.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := core.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
 	deleted := false
 	kubeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cronJob).
 		WithInterceptorFuncs(interceptor.Funcs{
 			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-				if _, isPvc := obj.(*core.PersistentVolumeClaim); isPvc {
-					return wantErr
+				if _, isPvc := obj.(*core.PersistentVolumeClaim); isPvc && pvcGetErr != nil {
+					return pvcGetErr
 				}
 				return c.Get(ctx, key, obj, opts...)
 			},
@@ -88,11 +90,30 @@ func TestBackUpEnforceSpecKeepsCronJobWhenPvcLookupFails(t *testing.T) {
 		},
 		template.ResourcesCreatorFromTemplate{},
 	)
+	return enforcer, &deleted
+}
+
+func TestBackUpEnforceSpecKeepsEphemeralCronJobWhilePvcIsMissing(t *testing.T) {
+	kubegres, cronJob := newEphemeralBackUpFixture()
+	enforcer, deleted := newBackUpEnforcerForTest(t, kubegres, cronJob, nil)
+
+	if err := enforcer.EnforceSpec(); err != nil {
+		t.Fatalf("EnforceSpec() error = %v", err)
+	}
+	if *deleted {
+		t.Fatal("backup CronJob using the ephemeral fallback was deleted although the PVC still does not exist")
+	}
+}
+
+func TestBackUpEnforceSpecKeepsCronJobWhenPvcLookupFails(t *testing.T) {
+	kubegres, cronJob := newEphemeralBackUpFixture()
+	wantErr := errors.New("api server unavailable")
+	enforcer, deleted := newBackUpEnforcerForTest(t, kubegres, cronJob, wantErr)
 
 	if err := enforcer.EnforceSpec(); !errors.Is(err, wantErr) {
 		t.Fatalf("EnforceSpec() error = %v, want %v", err, wantErr)
 	}
-	if deleted {
+	if *deleted {
 		t.Fatal("backup CronJob was deleted although the PVC lookup failed")
 	}
 }
