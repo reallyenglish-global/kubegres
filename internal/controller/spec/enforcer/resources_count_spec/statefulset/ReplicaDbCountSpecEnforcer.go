@@ -96,9 +96,19 @@ func (r *ReplicaDbCountSpecEnforcer) Enforce() error {
 	}
 
 	isManualFailoverRequested := r.isManualFailoverRequested()
+	var resetErr error
 	if isManualFailoverRequested {
-		r.resetInSpecManualFailover()
+		// A failed reset must not block replica reconciliation: the reset is
+		// retried on the next reconcile while replicas are still enforced.
+		if resetErr = r.resetInSpecManualFailover(); resetErr != nil {
+			r.kubegresContext.Log.ErrorEvent("ManualFailoverResetErr", resetErr, "Unable to reset the field 'failover.promotePod' in spec.")
+		}
 	}
+
+	return errors.Join(resetErr, r.enforceReplicaCount(isManualFailoverRequested))
+}
+
+func (r *ReplicaDbCountSpecEnforcer) enforceReplicaCount(isManualFailoverRequested bool) error {
 
 	if r.isReplicaOperationInProgress() {
 		return nil
