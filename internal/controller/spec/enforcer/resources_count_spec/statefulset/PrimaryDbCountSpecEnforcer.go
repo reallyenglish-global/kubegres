@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	postgresV1 "reactive-tech.io/kubegres/api/v1"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 	operation2 "reactive-tech.io/kubegres/internal/controller/operation"
@@ -88,12 +89,14 @@ func (r *PrimaryDbCountSpecEnforcer) Enforce() error {
 
 	if r.primaryToReplicaFailOver.ShouldWeFailOver() {
 		return r.primaryToReplicaFailOver.FailOver()
-
-	} else if r.shouldWeDeployNewPrimaryDb() {
-		return r.deployNewPrimaryStatefulSet()
 	}
 
-	return nil
+	shouldWeDeployNewPrimaryDb, err := r.shouldWeDeployNewPrimaryDb()
+	if err != nil || !shouldWeDeployNewPrimaryDb {
+		return err
+	}
+
+	return r.deployNewPrimaryStatefulSet()
 }
 
 func (r *PrimaryDbCountSpecEnforcer) initialiseStatusEnforcedReplicas() {
@@ -121,19 +124,26 @@ func (r *PrimaryDbCountSpecEnforcer) logKubegresFeaturesAreReEnabled() {
 		"We can safely re-enable all features of Kubegres.")
 }
 
-func (r *PrimaryDbCountSpecEnforcer) shouldWeDeployNewPrimaryDb() bool {
+func (r *PrimaryDbCountSpecEnforcer) shouldWeDeployNewPrimaryDb() (bool, error) {
 	// Bootstrap is create-time-only. Never recreate a primary after the initial
 	// deployment has been recorded; doing so could import a new snapshot into a
 	// replacement PVC after data loss.
 	if r.kubegresContext.Kubegres.Spec.Bootstrap != nil && r.kubegresContext.Kubegres.Status.BootstrapState == "completed" {
 		// A completed import is never repeated. Recovery from missing storage is
 		// intentionally fail-closed and requires an explicit operator decision.
-		return false
+		return false, nil
 	}
-	if r.kubegresContext.Kubegres.Spec.Bootstrap != nil && r.kubegresContext.Kubegres.Status.BootstrapState == "reserved" && r.getReservedBootstrapPvc().Name == "" {
-		// The initial StatefulSet create was accepted, but its exact PVC is now
-		// absent. Never allocate a new instance index and silently re-import.
-		return false
+	if r.kubegresContext.Kubegres.Spec.Bootstrap != nil && r.kubegresContext.Kubegres.Status.BootstrapState == "reserved" {
+		reservedPvc, err := r.getReservedBootstrapPvc()
+		if err != nil {
+			r.kubegresContext.Log.ErrorEvent("BootstrapPvcLookupErr", err, "Unable to read the PVC reserved for the bootstrap of the Primary DB.", "PVC name", r.kubegresContext.Kubegres.Status.BootstrapPVCName)
+			return false, err
+		}
+		if reservedPvc.Name == "" {
+			// The initial StatefulSet create was accepted, but its exact PVC is now
+			// absent. Never allocate a new instance index and silently re-import.
+			return false, nil
+		}
 	}
 
 	shouldWeDeployNewPrimary := !r.resourcesStates.StatefulSets.Primary.IsDeployed &&
@@ -141,11 +151,11 @@ func (r *PrimaryDbCountSpecEnforcer) shouldWeDeployNewPrimaryDb() bool {
 
 	if shouldWeDeployNewPrimary {
 		if *r.kubegresContext.Kubegres.Spec.Replicas == 1 || !r.hasPrimaryEverBeenDeployed() {
-			return true
+			return true, nil
 		}
 	}
 
-	return false
+	return false, nil
 }
 
 func (r *PrimaryDbCountSpecEnforcer) hasPrimaryEverBeenDeployed() bool {
@@ -159,7 +169,10 @@ func (r *PrimaryDbCountSpecEnforcer) deployNewPrimaryStatefulSet() error {
 		return nil
 	}
 
-	instanceIndex := r.getInstanceIndexIfPrimaryNeedsToBeRecreatedAndThereIsNoReplicaSetUp()
+	instanceIndex, err := r.getInstanceIndexIfPrimaryNeedsToBeRecreatedAndThereIsNoReplicaSetUp()
+	if err != nil {
+		return err
+	}
 
 	if instanceIndex == 0 {
 		instanceIndex = r.kubegresContext.Status.GetLastCreatedInstanceIndex() + 1
@@ -217,20 +230,25 @@ func (r *PrimaryDbCountSpecEnforcer) logDeploymentTimedOut() {
 		"Primary DB StatefulSet to fix", primaryStatefulSetName)
 }
 
-func (r *PrimaryDbCountSpecEnforcer) getInstanceIndexIfPrimaryNeedsToBeRecreatedAndThereIsNoReplicaSetUp() int32 {
+func (r *PrimaryDbCountSpecEnforcer) getInstanceIndexIfPrimaryNeedsToBeRecreatedAndThereIsNoReplicaSetUp() (int32, error) {
 	if r.isThereReplicaToFailOverToInSpec() || r.wasPrimaryNeverDeployed() {
-		return 0
+		return 0, nil
 	}
 
-	primaryPvc := r.getLastDeployedPrimaryPvc()
+	primaryPvc, err := r.getLastDeployedPrimaryPvc()
+	if err != nil {
+		r.kubegresContext.Log.ErrorEvent("PrimaryPvcLookupErr", err, "Unable to read the PVC of the last deployed Primary DB. "+
+			"We will not recreate the Primary StatefulSet until the PVC can be read, so that an existing PVC is not replaced by a new one.")
+		return 0, err
+	}
 
 	if primaryPvc.Name != "" {
 		r.kubegresContext.Log.InfoEvent("RecreatingPrimaryStatefulSet", "We will recreate a new Primary StatefulSet as it is not available. We will reuse existing PVC: '"+primaryPvc.Name+"'")
-		return r.kubegresContext.Status.GetLastCreatedInstanceIndex()
+		return r.kubegresContext.Status.GetLastCreatedInstanceIndex(), nil
 	}
 
 	r.kubegresContext.Log.InfoEvent("RecreatingPrimaryStatefulSet", "We will recreate a new Primary StatefulSet as it is not available. We will create a new PVC as the existing one is not available '"+primaryPvc.Name+"'")
-	return 0
+	return 0, nil
 }
 
 func (r *PrimaryDbCountSpecEnforcer) isThereReplicaToFailOverToInSpec() bool {
@@ -247,7 +265,9 @@ func (r *PrimaryDbCountSpecEnforcer) activateBlockingOperation(statefulSetInstan
 		statefulSetInstanceIndex)
 }
 
-func (r *PrimaryDbCountSpecEnforcer) getLastDeployedPrimaryPvc() *v1.PersistentVolumeClaim {
+// getLastDeployedPrimaryPvc returns an empty PVC when it does not exist, and
+// an error for any other lookup failure.
+func (r *PrimaryDbCountSpecEnforcer) getLastDeployedPrimaryPvc() (*v1.PersistentVolumeClaim, error) {
 
 	lastCreatedInstanceIndex := r.kubegresContext.Status.GetLastCreatedInstanceIndex()
 	kubegresName := r.kubegresContext.Kubegres.Name
@@ -255,18 +275,25 @@ func (r *PrimaryDbCountSpecEnforcer) getLastDeployedPrimaryPvc() *v1.PersistentV
 
 	namespace := r.kubegresContext.Kubegres.Namespace
 	resourceKey := client.ObjectKey{Namespace: namespace, Name: resourceName}
-	pvc := &v1.PersistentVolumeClaim{}
-	_ = r.kubegresContext.Client.Get(r.kubegresContext.Ctx, resourceKey, pvc)
-	return pvc
+	return r.getPvcIfExists(resourceKey)
 }
 
-func (r *PrimaryDbCountSpecEnforcer) getReservedBootstrapPvc() *v1.PersistentVolumeClaim {
-	pvc := &v1.PersistentVolumeClaim{}
+// getReservedBootstrapPvc returns an empty PVC when it does not exist, and
+// an error for any other lookup failure.
+func (r *PrimaryDbCountSpecEnforcer) getReservedBootstrapPvc() (*v1.PersistentVolumeClaim, error) {
 	pvcName := r.kubegresContext.Kubegres.Status.BootstrapPVCName
 	if pvcName == "" {
-		return pvc
+		return &v1.PersistentVolumeClaim{}, nil
 	}
 	resourceKey := client.ObjectKey{Namespace: r.kubegresContext.Kubegres.Namespace, Name: pvcName}
-	_ = r.kubegresContext.Client.Get(r.kubegresContext.Ctx, resourceKey, pvc)
-	return pvc
+	return r.getPvcIfExists(resourceKey)
+}
+
+func (r *PrimaryDbCountSpecEnforcer) getPvcIfExists(resourceKey client.ObjectKey) (*v1.PersistentVolumeClaim, error) {
+	pvc := &v1.PersistentVolumeClaim{}
+	err := r.kubegresContext.Client.Get(r.kubegresContext.Ctx, resourceKey, pvc)
+	if apierrors.IsNotFound(err) {
+		return &v1.PersistentVolumeClaim{}, nil
+	}
+	return pvc, err
 }
