@@ -166,6 +166,7 @@ func (r *KubegresReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kubegresv1.Kubegres{}).
 		Named(ctx2.KindKubegres).
 		Owns(&apps.StatefulSet{}).
+		Owns(&core.PersistentVolumeClaim{}).
 		Owns(&core.Service{}).
 		Complete(r)
 }
