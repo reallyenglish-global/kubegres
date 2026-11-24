@@ -21,112 +21,56 @@ limitations under the License.
 package kindcluster
 
 import (
-	"bytes"
-	"log"
+	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"slices"
 	"strings"
+	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
 const clusterName = "kubegres"
 
-type KindTestClusterUtil struct {
-	kindExecPath string
-}
-
-func (r *KindTestClusterUtil) StartCluster() {
-
-	log.Println("STARTING KIND CLUSTER '" + clusterName + "'")
-
-	// start kind cluster
-	var err error
-	r.kindExecPath, err = exec.LookPath("kind")
+// PrepareEnvironment creates or reuses the named disposable cluster and binds
+// envtest before Start can install CRDs. The kubeconfig for diagnostics
+// must be in a private suite directory, never the caller's default kubeconfig.
+func PrepareEnvironment(kubeconfig, crdDir string) (*envtest.Environment, error) {
+	clusters, err := exec.Command("kind", "get", "clusters").Output()
 	if err != nil {
-		log.Fatal("We cannot find the executable 'kind'. " +
-			"Make sure 'kind' is installed and the executable 'kind' " +
-			"is in the classpath before running the tests.")
+		return nil, fmt.Errorf("list Kind clusters: %w", err)
 	}
-
-	if r.isClusterRunning() {
-		log.Println("Cluster is already running. No need to restart it.")
-		return
-	}
-
-	clusterConfigFilePath := r.getClusterConfigFilePath()
-
-	log.Println("Running 'kind create cluster --name " + clusterName + " --config " + clusterConfigFilePath + "'")
-
-	var out bytes.Buffer
-	cmdStartCluster := &exec.Cmd{
-		Path:   r.kindExecPath,
-		Args:   []string{r.kindExecPath, "create", "cluster", "--name", clusterName, "--config", clusterConfigFilePath},
-		Stdout: &out,
-		Stderr: os.Stdout,
-	}
-
-	err = cmdStartCluster.Run()
-	if err != nil {
-		log.Fatal("Unable to execute the command 'kind create cluster --name "+clusterName+" --config "+clusterConfigFilePath+"'", err)
-	} else {
-		log.Println("CLUSTER STARTED")
-	}
-}
-
-func (r *KindTestClusterUtil) DeleteCluster() bool {
-
-	log.Println("DELETING KIND CLUSTER '" + clusterName + "'")
-
-	log.Println("Running 'kind delete cluster --name " + clusterName + "'")
-
-	var out bytes.Buffer
-	cmdDeleteCluster := &exec.Cmd{
-		Path:   r.kindExecPath,
-		Args:   []string{r.kindExecPath, "delete", "cluster", "--name", clusterName},
-		Stdout: &out,
-		Stderr: os.Stdout,
-	}
-
-	err := cmdDeleteCluster.Run()
-	if err != nil {
-		log.Fatal("Unable to execute the command 'kind delete cluster --name "+clusterName+"'", err)
-		return false
-	}
-
-	return true
-}
-
-func (r *KindTestClusterUtil) isClusterRunning() bool {
-
-	var out bytes.Buffer
-	cmdGetClusters := &exec.Cmd{
-		Path:   r.kindExecPath,
-		Args:   []string{r.kindExecPath, "get", "clusters"},
-		Stdout: &out,
-		Stderr: os.Stdout,
-	}
-
-	err := cmdGetClusters.Run()
-	if err != nil {
-		log.Fatal("Unable to execute the command 'kind get clusters'", err)
-	}
-
-	outputLines := strings.Split(out.String(), "\n")
-	for _, cluster := range outputLines {
-		if cluster == clusterName {
-			return true
+	if !slices.Contains(strings.Fields(string(clusters)), clusterName) {
+		cmd := exec.Command("kind", "create", "cluster", "--name", clusterName, "--config", "util/kindcluster/kind-cluster-config.yaml", "--kubeconfig", kubeconfig)
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return nil, fmt.Errorf("create Kind cluster: %w", err)
 		}
-		log.Println("cluster: '" + cluster + "'")
 	}
-	return false
+	data, err := exec.Command("kind", "get", "kubeconfig", "--name", clusterName).Output()
+	if err != nil {
+		return nil, fmt.Errorf("get kubeconfig for Kind cluster %q: %w", clusterName, err)
+	}
+	cfg, err := namedConfig(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(kubeconfig, data, 0600); err != nil {
+		return nil, err
+	}
+	cfg.Timeout = 30 * time.Second
+	useExistingCluster := true
+	return &envtest.Environment{
+		Config:                cfg,
+		UseExistingCluster:    &useExistingCluster,
+		CRDDirectoryPaths:     []string{crdDir},
+		ErrorIfCRDPathMissing: true,
+	}, nil
 }
 
-// envtest installs CRDs in BeforeSuite; do not rebuild/install a second time.
-
-func (r *KindTestClusterUtil) getClusterConfigFilePath() string {
-	fileAbsolutePath, err := filepath.Abs("util/kindcluster/kind-cluster-config.yaml")
-	if err != nil {
-		log.Fatal("Error while trying to get the absolute-path of 'kind-cluster-config.yaml': ", err)
-	}
-	return fileAbsolutePath
+func DeleteCluster(kubeconfig string) error {
+	cmd := exec.Command("kind", "delete", "cluster", "--name", clusterName, "--kubeconfig", kubeconfig)
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }

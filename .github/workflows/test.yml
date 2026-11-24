@@ -75,16 +75,17 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Isolate Kind kubeconfig (including action cleanup)
+        run: echo "KUBECONFIG=$RUNNER_TEMP/kubegres-kubeconfig" >> "$GITHUB_ENV"
+
       - name: Set up Kind cluster
         uses: helm/kind-action@v1.12.0
         with:
           version: v0.33.0
           node_image: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
           cluster_name: kubegres
+          kubeconfig: ${{ runner.temp }}/kubegres-kubeconfig
           config: internal/test/util/kindcluster/kind-cluster-config.yaml
-
-      - name: Export KUBECONFIG
-        run: echo "KUBECONFIG=${HOME}/.kube/config" >> "$GITHUB_ENV"
 
       - name: Run Tests
         env:
@@ -103,15 +104,7 @@ jobs:
 
       - name: Collect Kubernetes diagnostics
         if: always()
-        run: |
-          mkdir -p artifacts/kubernetes
-          kubectl get pods -A -o wide > artifacts/kubernetes/pods.txt || true
-          kubectl get statefulsets -A > artifacts/kubernetes/statefulsets.txt || true
-          kubectl get pvc -A > artifacts/kubernetes/pvcs.txt || true
-          kubectl get kubegres -A > artifacts/kubernetes/kubegres.txt || true
-          kubectl get events -A --sort-by=.lastTimestamp > artifacts/kubernetes/events.txt || true
-          kubectl describe pods -A > artifacts/kubernetes/pod-descriptions.txt || true
-          kubectl describe statefulsets -A > artifacts/kubernetes/statefulset-descriptions.txt || true
+        run: python3 hack/collect_test_diagnostics.py artifacts/kubernetes "$RUNNER_TEMP/kubegres-kubeconfig" --extended
 
       - name: Upload test reports and Kubernetes diagnostics
         if: always()
@@ -123,7 +116,7 @@ jobs:
 
       - name: Delete Kind cluster (cleanup)
         if: always()
-        run: kind delete cluster --name kubegres
+        run: kind delete cluster --name kubegres --kubeconfig "$RUNNER_TEMP/kubegres-kubeconfig"
 
   helm:
     name: Lint Helm chart

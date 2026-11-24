@@ -23,16 +23,10 @@ package test
 import (
 	"context"
 	"fmt"
-	"k8s.io/client-go/tools/record"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reactive-tech.io/kubegres/internal/controller"
-	util2 "reactive-tech.io/kubegres/internal/test/util"
-	"reactive-tech.io/kubegres/internal/test/util/kindcluster"
-	"runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"testing"
 	"time"
 
@@ -41,21 +35,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	postgresv1 "reactive-tech.io/kubegres/api/v1"
+	"reactive-tech.io/kubegres/internal/controller"
+	util2 "reactive-tech.io/kubegres/internal/test/util"
+	"reactive-tech.io/kubegres/internal/test/util/kindcluster"
 	// +kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-var kindCluster kindcluster.KindTestClusterUtil
-
-// var cfgTest *rest.Config
+var suiteKubeconfig string
 var k8sClientTest client.Client
 var k8sClientsetTest kubernetes.Interface
 var testEnv *envtest.Environment
@@ -69,34 +66,18 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 
-	kindCluster.StartCluster()
-
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	log.Print("START OF: BeforeSuite")
 
 	By("bootstrapping test environment")
-	useExistingCluster := true
-	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
-		ErrorIfCRDPathMissing: true,
-		UseExistingCluster:    &useExistingCluster,
-
-		// The BinaryAssetsDirectory is only required if you want to run the tests directly
-		// without call the makefile target test. If not informed it will look for the
-		// default path defined in controller-runtime which is /usr/local/kubebuilder/.
-		// Note that you must have the required binaries setup under the bin directory to perform
-		// the tests directly. When we run make test it will be setup and used automatically.
-		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
-			fmt.Sprintf("1.37.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
-	}
-
+	suiteKubeconfig = filepath.Join(GinkgoT().TempDir(), "kubeconfig")
+	var err error
+	testEnv, err = kindcluster.PrepareEnvironment(suiteKubeconfig, filepath.Join("..", "..", "config", "crd", "bases"))
+	Expect(err).NotTo(HaveOccurred())
 	cfg, err := testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
-	// Keep individual Kubernetes API requests bounded so an unavailable API server
-	// cannot block an Eventually assertion past its test timeout.
-	cfg.Timeout = 30 * time.Second
 
 	err = postgresv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
@@ -164,7 +145,7 @@ var _ = JustAfterEach(func() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	dest := filepath.Join("..", "..", "artifacts", "failures", fmt.Sprint(time.Now().UnixNano()))
-	output, err := exec.CommandContext(ctx, "python3", "../../hack/collect_test_diagnostics.py", dest).CombinedOutput()
+	output, err := exec.CommandContext(ctx, "python3", "../../hack/collect_test_diagnostics.py", dest, suiteKubeconfig).CombinedOutput()
 	fmt.Fprintf(GinkgoWriter, "Failure diagnostics: %s (%v)\n%s", dest, err, output)
 })
 
@@ -174,13 +155,16 @@ var _ = AfterSuite(func() {
 
 	By("tearing down the test environment")
 
+	if testEnv == nil { // Binding failed; do not run any cluster cleanup.
+		return
+	}
 	err := testEnv.Stop()
 	Expect(err).ToNot(HaveOccurred())
 
 	time.Sleep(5 * time.Second)
 
 	if os.Getenv("KUBEGRES_KEEP_TEST_CLUSTER") != "true" {
-		kindCluster.DeleteCluster()
+		Expect(kindcluster.DeleteCluster(suiteKubeconfig)).To(Succeed())
 	}
 
 	log.Print("END OF: Suite AfterSuite")
