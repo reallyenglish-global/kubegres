@@ -80,6 +80,17 @@ Only set this when `onPrimaryPodDrain` failover is enabled and a Ready
 replica is expected to be available; otherwise an unhealthy primary could be
 evicted with no safe promotion target.
 
+## Upgrading the promotion hook
+
+The promotion hook now exits nonzero if PostgreSQL never becomes ready, rather
+than reporting success without running `pg_ctl promote`. Upgrading the operator
+does not overwrite an existing `base-kubegres-config` ConfigMap. In each
+existing Kubegres namespace, compare its `promote_replica_to_primary.sh` entry
+with the [shipped hook](../internal/controller/spec/template/yaml/BaseConfigMapTemplate.yaml)
+and merge the readiness-exhaustion fix, preserving any local customizations
+and unrelated keys. A per-resource `spec.customConfig` cannot override this
+hook. Newly created base ConfigMaps already contain the fix.
+
 ## Rollback
 
 Set `onPrimaryPodDrain: false` to disable the automatic trigger. Existing manual promotion through `failover.promotePod` and existing crash failover behavior remain unchanged.

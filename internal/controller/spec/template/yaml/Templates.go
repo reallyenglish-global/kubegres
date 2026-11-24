@@ -316,6 +316,7 @@ data:
         su -c '/usr/lib/postgresql/$PG_MAJOR/bin/pg_ctl promote -D $PGDATA' postgres >> /usr/share/promotion.log
       else
         echo "$dt - Postgres is still not ready. We tried $counter times. Stopping attempts." > /usr/share/promotion.log
+        exit 1
       fi
     
     fi
