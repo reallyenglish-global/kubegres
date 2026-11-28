@@ -51,7 +51,7 @@ func newEphemeralBackUpFixture() (*postgresV1.Kubegres, *batch.CronJob) {
 	return kubegres, cronJob
 }
 
-func newBackUpEnforcerForTest(t *testing.T, kubegres *postgresV1.Kubegres, cronJob *batch.CronJob, pvcGetErr error) (BackUpCronJobCountSpecEnforcer, *bool) {
+func newBackUpEnforcerForTest(t *testing.T, kubegres *postgresV1.Kubegres, cronJob *batch.CronJob, pvcGetErr error, deleteErr error) (BackUpCronJobCountSpecEnforcer, *bool) {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	if err := batch.AddToScheme(scheme); err != nil {
@@ -71,6 +71,9 @@ func newBackUpEnforcerForTest(t *testing.T, kubegres *postgresV1.Kubegres, cronJ
 			},
 			Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
 				deleted = true
+				if deleteErr != nil {
+					return deleteErr
+				}
 				return c.Delete(ctx, obj, opts...)
 			},
 		}).Build()
@@ -102,18 +105,14 @@ func TestBackUpEnforceSpecKeepsEquivalentEphemeralStorageWhenPvcIsMissing(t *tes
 			Requests: core.ResourceList{core.ResourceStorage: resource.MustParse("1Gi")},
 		}},
 	}
-	enforcer, deleted := newBackUpEnforcerForTest(t, kubegres, cronJob, nil)
+	enforcer, deleted := newBackUpEnforcerForTest(t, kubegres, cronJob, nil, errors.New("unexpected CronJob deletion"))
 
-	panicked := false
-	func() {
-		defer func() { panicked = recover() != nil }() // Base behavior deletes before attempting to recreate the CronJob.
-		_ = enforcer.EnforceSpec()
-	}()
+	err := enforcer.EnforceSpec()
 	if *deleted {
 		t.Fatal("backup CronJob using equivalent ephemeral storage was deleted although the PVC still does not exist")
 	}
-	if panicked {
-		t.Fatal("EnforceSpec() panicked while keeping the backup CronJob")
+	if err != nil {
+		t.Fatalf("EnforceSpec() error = %v, want nil", err)
 	}
 }
 
@@ -125,7 +124,7 @@ func TestBackUpEnforceSpecDetectsChangedEphemeralStorageWhenPvcIsMissing(t *test
 			Requests: core.ResourceList{core.ResourceStorage: resource.MustParse("1Gi")},
 		}},
 	}
-	enforcer, _ := newBackUpEnforcerForTest(t, kubegres, cronJob, nil)
+	enforcer, _ := newBackUpEnforcerForTest(t, kubegres, cronJob, nil, nil)
 
 	hasChanged, err := enforcer.hasSpecChanged()
 	if err != nil {
@@ -139,7 +138,7 @@ func TestBackUpEnforceSpecDetectsChangedEphemeralStorageWhenPvcIsMissing(t *test
 func TestBackUpEnforceSpecKeepsCronJobWhenPvcLookupFails(t *testing.T) {
 	kubegres, cronJob := newEphemeralBackUpFixture()
 	wantErr := errors.New("api server unavailable")
-	enforcer, deleted := newBackUpEnforcerForTest(t, kubegres, cronJob, wantErr)
+	enforcer, deleted := newBackUpEnforcerForTest(t, kubegres, cronJob, wantErr, nil)
 
 	if err := enforcer.EnforceSpec(); !errors.Is(err, wantErr) {
 		t.Fatalf("EnforceSpec() error = %v, want %v", err, wantErr)
