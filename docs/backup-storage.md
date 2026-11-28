@@ -60,6 +60,16 @@ spec:
     volumeMount: /var/backups/postgres
 ```
 
+## Updating the backup script in existing namespaces
+
+The operator creates `base-kubegres-config` once per namespace. Upgrading the
+operator does not replace an existing `backup_database.sh`. Compare that key
+with the script in the new release's `BaseConfigMapTemplate.yaml` and merge the
+change into your managed ConfigMap, preserving local edits and all other keys.
+Also check each `spec.customConfig`: a per-resource backup script takes
+precedence and needs its own update. Verify a newly started backup Job uses
+the revised script; already running Jobs are not evidence of rollout.
+
 ## Backup time zone
 
 Set `spec.backup.timeZone` to an IANA time zone (for example
