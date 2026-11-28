@@ -24,6 +24,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"reactive-tech.io/kubegres/internal/controller/ctx"
 	"reactive-tech.io/kubegres/internal/controller/spec/template"
@@ -177,11 +178,14 @@ func (r *BackUpCronJobCountSpecEnforcer) hasSpecChanged() (hasSpecChanged bool, 
 		r.logSpecChange("spec.backup.pvcName")
 	}
 	if expectedUsesEphemeral && kubegresBackUpSpec.Size != "" {
-		currentSize := ""
 		if currentUsesEphemeral && cronJobTemplateSpec.Volumes[0].Ephemeral.VolumeClaimTemplate != nil {
-			currentSize = cronJobTemplateSpec.Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests.Storage().String()
-		}
-		if currentSize != kubegresBackUpSpec.Size {
+			currentRequest, hasStorageRequest := cronJobTemplateSpec.Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests[core.ResourceStorage]
+			expectedRequest, parseErr := resource.ParseQuantity(kubegresBackUpSpec.Size)
+			if !hasStorageRequest || parseErr != nil || currentRequest.Cmp(expectedRequest) != 0 {
+				hasSpecChanged = true
+				r.logSpecChange("spec.backup.size")
+			}
+		} else {
 			hasSpecChanged = true
 			r.logSpecChange("spec.backup.size")
 		}
