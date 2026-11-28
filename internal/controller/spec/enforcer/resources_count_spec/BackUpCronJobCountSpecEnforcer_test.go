@@ -7,6 +7,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -93,15 +94,41 @@ func newBackUpEnforcerForTest(t *testing.T, kubegres *postgresV1.Kubegres, cronJ
 	return enforcer, &deleted
 }
 
-func TestBackUpEnforceSpecKeepsEphemeralCronJobWhilePvcIsMissing(t *testing.T) {
+func TestBackUpEnforceSpecKeepsEquivalentEphemeralStorageWhenPvcIsMissing(t *testing.T) {
 	kubegres, cronJob := newEphemeralBackUpFixture()
-	enforcer, deleted := newBackUpEnforcerForTest(t, kubegres, cronJob, nil)
-
-	if err := enforcer.EnforceSpec(); err != nil {
-		t.Fatalf("EnforceSpec() error = %v", err)
+	kubegres.Spec.Backup.Size = "1024Mi"
+	cronJob.Spec.JobTemplate.Spec.Template.Spec.Volumes[0].Ephemeral.VolumeClaimTemplate = &core.PersistentVolumeClaimTemplate{
+		Spec: core.PersistentVolumeClaimSpec{Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{core.ResourceStorage: resource.MustParse("1Gi")},
+		}},
 	}
-	if *deleted {
-		t.Fatal("backup CronJob using the ephemeral fallback was deleted although the PVC still does not exist")
+	enforcer, _ := newBackUpEnforcerForTest(t, kubegres, cronJob, nil)
+
+	hasChanged, err := enforcer.hasSpecChanged()
+	if err != nil {
+		t.Fatalf("hasSpecChanged() error = %v", err)
+	}
+	if hasChanged {
+		t.Fatal("backup CronJob using equivalent ephemeral storage was marked changed although the PVC still does not exist")
+	}
+}
+
+func TestBackUpEnforceSpecDetectsChangedEphemeralStorageWhenPvcIsMissing(t *testing.T) {
+	kubegres, cronJob := newEphemeralBackUpFixture()
+	kubegres.Spec.Backup.Size = "2Gi"
+	cronJob.Spec.JobTemplate.Spec.Template.Spec.Volumes[0].Ephemeral.VolumeClaimTemplate = &core.PersistentVolumeClaimTemplate{
+		Spec: core.PersistentVolumeClaimSpec{Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{core.ResourceStorage: resource.MustParse("1Gi")},
+		}},
+	}
+	enforcer, _ := newBackUpEnforcerForTest(t, kubegres, cronJob, nil)
+
+	hasChanged, err := enforcer.hasSpecChanged()
+	if err != nil {
+		t.Fatalf("hasSpecChanged() error = %v", err)
+	}
+	if !hasChanged {
+		t.Fatal("backup CronJob with a different ephemeral storage request was not marked changed")
 	}
 }
 
