@@ -33,11 +33,20 @@ class ReportsTest(unittest.TestCase):
 
     def test_diagnostics_timeout_does_not_mask_failure(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(diagnostics.subprocess, 'run', side_effect=subprocess.TimeoutExpired('kubectl', 12)) as run:
-            diagnostics.collect(directory)
-            self.assertEqual(len(list(Path(directory).glob('*.txt'))), 4)
+            config = Path(directory) / 'private-config'
+            config.touch()
+            diagnostics.collect(directory, config, extended=True)
+            self.assertEqual(len(list(Path(directory).glob('*.txt'))), 7)
             for call in run.call_args_list:
                 self.assertIn('--context=kind-kubegres', call.args[0])
+                self.assertIn(f'--kubeconfig={config}', call.args[0])
                 self.assertEqual(call.kwargs['timeout'], 12)
+
+    def test_missing_diagnostics_config_never_invokes_kubectl(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(diagnostics.subprocess, 'run') as run:
+            with self.assertRaises(FileNotFoundError):
+                diagnostics.collect(directory, Path(directory) / 'missing')
+            run.assert_not_called()
 
 
 if __name__ == '__main__':

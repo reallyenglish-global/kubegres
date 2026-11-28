@@ -28,6 +28,10 @@ The operator image is published at `ghcr.io/reallyenglish-global/kubegres`.
 
 For Helm users, the repository includes a chart at [`charts/kubegres`](charts/kubegres/README.md). It installs the operator, RBAC, metrics service, and CRD; see the chart README for CRD lifecycle guidance.
 
+## Testing
+
+Use `make test-fast` for checks that do not require a cluster. `make test` is destructive: it creates or reuses the Kind cluster named `kubegres`, installs CRDs, updates the `standard` StorageClass, and normally deletes that cluster afterward. Reserve this name for disposable test data. The suite obtains its kubeconfig from `kind get kubeconfig --name kubegres`; no `kubectl config use-context` is needed. If the named binding cannot be loaded, the suite does not start envtest or run Kubernetes cleanup.
+
 ## Compatibility
 
 | | |
