@@ -102,14 +102,18 @@ func TestBackUpEnforceSpecKeepsEquivalentEphemeralStorageWhenPvcIsMissing(t *tes
 			Requests: core.ResourceList{core.ResourceStorage: resource.MustParse("1Gi")},
 		}},
 	}
-	enforcer, _ := newBackUpEnforcerForTest(t, kubegres, cronJob, nil)
+	enforcer, deleted := newBackUpEnforcerForTest(t, kubegres, cronJob, nil)
 
-	hasChanged, err := enforcer.hasSpecChanged()
-	if err != nil {
-		t.Fatalf("hasSpecChanged() error = %v", err)
+	panicked := false
+	func() {
+		defer func() { panicked = recover() != nil }() // Base behavior deletes before attempting to recreate the CronJob.
+		_ = enforcer.EnforceSpec()
+	}()
+	if *deleted {
+		t.Fatal("backup CronJob using equivalent ephemeral storage was deleted although the PVC still does not exist")
 	}
-	if hasChanged {
-		t.Fatal("backup CronJob using equivalent ephemeral storage was marked changed although the PVC still does not exist")
+	if panicked {
+		t.Fatal("EnforceSpec() panicked while keeping the backup CronJob")
 	}
 }
 
